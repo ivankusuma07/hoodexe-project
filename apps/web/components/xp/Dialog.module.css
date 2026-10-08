@@ -1,0 +1,22 @@
+.content {
+  padding: 14px 14px 6px;
+  line-height: 1.45;
+  overflow: auto;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px 12px;
+}
+
+.message {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.message > svg { flex: 0 0 32px; }
+
+.text { padding-top: 2px; }
+.text p { margin: 0 0 8px; }

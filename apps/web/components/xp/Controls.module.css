@@ -1,0 +1,88 @@
+/* Group box */
+.group {
+  border: 1px solid #d0d0bf;
+  border-radius: 3px;
+  margin: 0 0 10px;
+  padding: 8px 10px 10px;
+}
+.group > legend { color: #0046d5; padding: 0 3px; }
+
+/* Tab control */
+.tabs { display: flex; flex-direction: column; min-height: 0; }
+.tabList {
+  display: flex;
+  gap: 1px;
+  padding-left: 3px;
+  position: relative;
+  z-index: 1;
+}
+.tab {
+  font: inherit;
+  font-size: 11px;
+  color: #000;
+  padding: 3px 10px 2px;
+  border: 1px solid #919b9c;
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(to bottom, #fff, #fcfcfe 26%, #f4f3ee 70%, #e7e6df);
+  margin-top: 2px;
+}
+.tab:hover { border-top: 2px solid #f9c94c; padding-top: 2px; }
+.tabActive {
+  margin-top: 0;
+  padding-bottom: 4px;
+  background: #fcfcfe;
+  border-top: 2px solid var(--hood-accent);
+  margin-bottom: -1px;
+}
+.tabPanel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #919b9c;
+  background: #fcfcfe;
+  padding: 8px;
+  box-shadow: 1px 1px 0 #d0d0bf;
+}
+
+/* Progress bar (block style) */
+.progress {
+  height: 14px;
+  border: 1px solid #686868;
+  border-radius: 3px;
+  background: #fff;
+  padding: 1px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent 8px,
+      #fff 8px,
+      #fff 10px
+    ),
+    linear-gradient(to bottom, #acedad 0%, #7be47d 14%, #4cda50 28%, #2ed330 42%, #42d845 57%, #76e275 71%, #8fe791 85%, #fff 100%);
+  transition: width 0.3s;
+}
+
+/* Status bar */
+.status {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+  padding: 2px 3px;
+  background: var(--window-chrome);
+  border-top: 1px solid #d6d2c2;
+}
+.statusCell {
+  flex: 1 1 auto;
+  padding: 1px 4px;
+  border: 1px solid;
+  border-color: #a5a294 #fff #fff #a5a294;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.statusCell:last-child { flex: 0 0 auto; }
