@@ -1,0 +1,111 @@
+.pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 16px;
+  line-height: 1.45;
+}
+
+.white { background: #fff; }
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.display {
+  margin: 4px 0 6px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1.2;
+  color: #0a246a;
+}
+
+.lead { margin: 0 0 14px; font-size: 12px; color: #222; }
+
+.ctaRow { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+
+.tip {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid #c9b77b;
+  background: #ffffe1;
+  margin-bottom: 10px;
+}
+.tip > svg { flex: 0 0 auto; }
+.tip p { margin: 0; }
+
+.fineprint { color: #6a6a6a; font-size: 10px; margin: 8px 0 0; }
+
+.infoTable { width: 100%; border-collapse: collapse; }
+.infoTable th, .infoTable td { text-align: left; vertical-align: top; padding: 3px 4px; }
+.infoTable th { width: 110px; font-weight: 400; color: #4b4b4b; }
+
+.center { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
+
+.footerRow {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 12px 10px;
+}
+
+.steps { margin: 6px 0 10px; padding-left: 20px; }
+.steps li { margin-bottom: 4px; }
+
+.example {
+  padding: 8px 10px;
+  border: 1px solid var(--field-border);
+  background: #fff;
+}
+.theorem { font-family: var(--font-display); font-style: italic; font-size: 13px; }
+
+/* Details list view (Recycle Bin, later Explore list mode). */
+.list { width: 100%; border-collapse: collapse; background: #fff; }
+.list th {
+  position: sticky;
+  top: 0;
+  text-align: left;
+  font-weight: 400;
+  padding: 3px 6px;
+  background: linear-gradient(to bottom, #fff, #f1efe2);
+  border-right: 1px solid #d6d2c2;
+  border-bottom: 1px solid #d6d2c2;
+  white-space: nowrap;
+}
+.list td { padding: 2px 6px; white-space: nowrap; }
+.list tbody tr:hover { background: #e8eef9; }
+.nameCell { display: flex; align-items: center; gap: 4px; }
+.listWrap { flex: 1 1 auto; min-height: 0; overflow: auto; background: #fff; border-top: 1px solid #d6d2c2; }
+
+/* Setup-style placeholder for programs that arrive in later weeks. */
+.setup { flex: 1 1 auto; min-height: 0; display: flex; }
+.setupSide {
+  flex: 0 0 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #fff;
+  text-align: center;
+  padding: 12px;
+  background: linear-gradient(to bottom, #3169c6 0%, #6b97e0 60%, #9fbdee 100%);
+}
+.setupMain { flex: 1 1 auto; min-width: 0; padding: 16px; background: #fff; overflow: auto; }
+.setupMain h3 { margin: 0 0 8px; font-size: 13px; }
+.setupMain ul { margin: 6px 0 12px; padding-left: 18px; }
+
+.balance { font-family: var(--font-mono); font-size: 12px; }
+
+@media (max-width: 640px) {
+  .setupSide { display: none; }
+  .display { font-size: 20px; }
+}
