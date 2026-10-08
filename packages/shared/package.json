@@ -1,0 +1,19 @@
+{
+  "name": "@hood/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "viem": "^2"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "viem": "2.57.4"
+  }
+}
