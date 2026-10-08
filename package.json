@@ -1,0 +1,12 @@
+{
+  "name": "hood-exe",
+  "private": true,
+  "packageManager": "pnpm@11.10.0",
+  "engines": { "node": ">=20.9" },
+  "scripts": {
+    "dev": "pnpm --filter @hood/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
