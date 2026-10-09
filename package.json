@@ -11,6 +11,7 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "dev:api": "pnpm --filter @hood/api dev"
+    "dev:api": "pnpm --filter @hood/api dev",
+    "fork": "pnpm --filter @hood/shared fork"
   }
 }

@@ -11,7 +11,8 @@
     "check:pons": "tsx scripts/check-pons.ts",
     "test": "vitest run",
     "sync:pairs": "tsx scripts/sync-pairs.ts",
-    "simulate:launch": "tsx scripts/simulate-launch.ts"
+    "simulate:launch": "tsx scripts/simulate-launch.ts",
+    "fork": "tsx scripts/fork.ts"
   },
   "peerDependencies": {
     "viem": "^2"

@@ -44,6 +44,30 @@ Open the web app on `localhost`, not `127.0.0.1`, so the session cookie reaches 
 - API tests run on in-process Postgres (PGlite) and need no Docker.
 - Schema changes: edit `apps/api/src/db/schema.ts`, then `pnpm --filter @hood/api db:generate`.
 
+### Local chain (fork of 4663)
+
+Needs [Foundry](https://getfoundry.sh)'s `anvil` (on PATH, in `~/.foundry/bin`, or `ANVIL=…`).
+
+```bash
+pnpm fork             # Robinhood Chain with live Pons V2 on http://127.0.0.1:8545
+pnpm fork --refresh   # re-fork mainnet (new launch terms or pair tokens)
+```
+
+The public RPC only keeps ~10 minutes of state, so `pnpm fork` forks once, runs every launch path the wizard uses (including a dev buy that fills the curve), saves the state to `.fork/`, and serves that snapshot with no upstream. Each run starts from the snapshot.
+
+To launch from the wizard against it, with no browser wallet needed:
+
+```bash
+# apps/web/.env.local
+NEXT_PUBLIC_API_URL=http://localhost:8787
+NEXT_PUBLIC_RPC_URL=http://127.0.0.1:8545
+NEXT_PUBLIC_DEV_WALLET=1        # adds "Anvil dev wallet" (anvil signs for it); only with a localhost RPC
+# apps/api/.env
+RPC_URL_SERVER=http://127.0.0.1:8545
+```
+
+The four anvil dev accounts get 10,000 ETH and 10,000 USDG each. A real wallet works too: add a network with chain id 4663 and RPC `http://127.0.0.1:8545`, and import an anvil dev key. Blockscout links in the wizard point at mainnet and won't resolve fork transactions.
+
 ### Chain checks
 
 Read-only against chain 4663; nothing is sent.

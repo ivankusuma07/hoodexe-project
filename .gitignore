@@ -11,3 +11,6 @@ coverage/
 .DS_Store
 npm-debug.log*
 pnpm-debug.log*
+
+# Local chain snapshot (pnpm fork)
+.fork/
