@@ -154,6 +154,21 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000) {
       return data.Trade;
     },
 
+    /** Every curve trade where `wallet` bought, sold or received, oldest first (portfolio cost basis). */
+    async walletTrades(wallet: string, max = 5_000): Promise<WalletTrade[]> {
+      const rows = await all(
+        `query WalletTrades($wallet: String!, $limit: Int!, $offset: Int!) {
+          Trade(where: { _or: [{ trader: { _eq: $wallet } }, { recipient: { _eq: $wallet } }] }, order_by: [{ blockNumber: asc }, { id: asc }], limit: $limit, offset: $offset) {
+            token trader recipient isBuy quoteAmount tokenAmount
+          }
+        }`,
+        { wallet },
+        z.array(z.object({ token: z.string(), trader: z.string(), recipient: z.string(), isBuy: z.boolean(), quoteAmount: big, tokenAmount: big })),
+        'Trade',
+      );
+      return rows.slice(0, max);
+    },
+
     /** Newest `limit` trades, newest first. */
     async trades(token: string, limit: number): Promise<EnvioTrade[]> {
       const data = await query(
@@ -183,3 +198,5 @@ export function envioLaunchSource(envio: EnvioClient, rpc: LaunchSource): Launch
     state: (items) => rpc.state(items),
   };
 }
+
+export type WalletTrade = { token: string; trader: string; recipient: string; isBuy: boolean; quoteAmount: bigint; tokenAmount: bigint };

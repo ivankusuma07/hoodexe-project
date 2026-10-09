@@ -234,6 +234,7 @@ describe('indexer-backed volume, candles and trades', () => {
       candles: async () => [],
       trades: async () => [],
       bigBuys: async () => [],
+      walletTrades: async () => [],
       ...over,
     };
   }

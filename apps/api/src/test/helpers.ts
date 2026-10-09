@@ -6,7 +6,8 @@ import { buildApp } from '../app';
 import { connectMemory } from '../db';
 import { loadEnv } from '../env';
 import { memoryKv } from '../kv';
-import type { ChainReader, LaunchOnChain } from '../services/chain';
+import type { ChainReader, LaunchOnChain, LaunchRecord } from '../services/chain';
+import type { CurveState, TokenMetadata } from '../services/tokenIndex';
 import type { EnvioClient } from '../services/envio';
 import type { Moderator } from '../services/moderation';
 import { devPinner } from '../services/pinner';
@@ -39,10 +40,17 @@ export async function setup(opts: { scorer?: Scorer; launches?: Map<string, Laun
   const launches = opts.launches ?? new Map();
   /** ETH balances by lowercase address; anyone not listed holds 1 ETH. */
   const balances = new Map<string, bigint>();
+  /** ERC-20 balances keyed "token:owner" (lowercase), and factory records for coins outside the token table. */
+  const tokenBalances = new Map<string, bigint>();
+  const launchRecords = new Map<string, LaunchRecord>();
+  /** Live metadata and curve state the portfolio reads, by lowercase token address. */
+  const market = { meta: new Map<string, TokenMetadata>(), state: new Map<string, CurveState>() };
   const chain: ChainReader = {
     verifySignature: (address, message, signature) => verifyMessage({ address, message, signature }),
     launchFromTx: async (hash) => launches.get(hash.toLowerCase()) ?? null,
     balance: async (address) => balances.get(address.toLowerCase()) ?? 10n ** 18n,
+    tokenBalances: async (owner, tokens) => new Map(tokens.flatMap((t) => { const b = tokenBalances.get(t.toLowerCase() + ':' + owner.toLowerCase()); return b == null ? [] : [[t, b] as const]; })),
+    launchRecords: async (tokens) => new Map(tokens.flatMap((t) => { const r = launchRecords.get(t.toLowerCase()); return r ? [[t, r] as const] : []; })),
   };
   const pinner = devPinner();
   const pubsub = memoryPubSub();
@@ -57,6 +65,10 @@ export async function setup(opts: { scorer?: Scorer; launches?: Map<string, Laun
     pinner,
     chain,
     envio: opts.envio,
+    market: {
+      metadata: async (tokens) => new Map(tokens.flatMap((t) => { const m = market.meta.get(t.toLowerCase()); return m ? [[t, m] as const] : []; })),
+      state: async (items) => new Map(items.flatMap((i) => { const s = market.state.get(i.token.toLowerCase()); return s ? [[i.token, s] as const] : []; })),
+    },
     moderator: opts.moderator ?? moderator,
     pubsub,
     now: () => new Date(clock),
@@ -68,6 +80,9 @@ export async function setup(opts: { scorer?: Scorer; launches?: Map<string, Laun
     scorerCalls,
     launches,
     balances,
+    tokenBalances,
+    launchRecords,
+    market,
     pubsub,
     moderated,
     advance: (ms: number) => void (clock += ms),

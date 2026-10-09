@@ -14,11 +14,13 @@ import type { Moderator } from './services/moderation';
 import type { Pinner } from './services/pinner';
 import type { PubSub } from './services/pubsub';
 import type { Scorer } from './services/scorer';
+import type { LaunchSource } from './services/tokenIndex';
 import { authRoutes } from './routes/auth';
 import { calloutRoutes } from './routes/callouts';
 import { ipfsRoutes } from './routes/ipfs';
 import { launchRoutes } from './routes/launches';
 import { liveRoutes } from './routes/live';
+import { portfolioRoutes } from './routes/portfolio';
 import { scoreRoutes } from './routes/score';
 import { tokenRoutes } from './routes/tokens';
 
@@ -31,6 +33,8 @@ export type Deps = {
   chain: ChainReader;
   /** The indexer, when ENVIO_GRAPHQL_URL is set: charts, trades, volume. */
   envio?: EnvioClient;
+  /** Live token metadata and curve state over RPC (eth_call only), for the portfolio. */
+  market: Pick<LaunchSource, 'metadata' | 'state'>;
   /** The model step of callout moderation (§10). */
   moderator: Moderator;
   /** Live callouts and reactions, from this process and the worker, to the WebSockets. */
@@ -132,5 +136,6 @@ export async function buildApp(deps: Deps) {
   await app.register(tokenRoutes);
   await app.register(calloutRoutes);
   await app.register(liveRoutes);
+  await app.register(portfolioRoutes);
   return app;
 }

@@ -24,6 +24,7 @@ const app = await buildApp({
   env,
   db,
   envio,
+  market: rpcLaunchSource(env.RPC_URL_SERVER),
   kv,
   chain: rpcChainReader(env.RPC_URL_SERVER),
   scorer: deepseek ? deepseekScorer(deepseek) : offlineScorer,

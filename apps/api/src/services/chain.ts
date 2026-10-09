@@ -1,6 +1,7 @@
 import {
   TransactionReceiptNotFoundError,
   createPublicClient,
+  erc20Abi,
   http,
   isAddressEqual,
   parseEventLogs,
@@ -26,13 +27,50 @@ export interface ChainReader {
   launchFromTx(hash: Hash): Promise<LaunchOnChain | 'pending' | null>;
   /** Native ETH balance on 4663 (posting callouts needs a non-zero one, docs/BRIEF.md §10). */
   balance(address: Address): Promise<bigint>;
+  /** ERC-20 balances of `owner` for each token; failed reads are left out. */
+  tokenBalances(owner: Address, tokens: Address[]): Promise<Map<Address, bigint>>;
+  /** getLaunchedToken for each token (Pons V2 only); tokens the factory doesn't know are left out. */
+  launchRecords(tokens: Address[]): Promise<Map<Address, LaunchRecord>>;
 }
+
+export type LaunchRecord = { curve: Address; deployer: Address; pairToken: Address; graduationThreshold: bigint; launchedAt: Date | null };
 
 export function rpcChainReader(rpcUrl: string = PUBLIC_RPC_MAINNET): ChainReader {
   const client = createPublicClient({ chain: robinhoodChain(rpcUrl), transport: http(rpcUrl, { retryCount: 3 }) });
   return {
     verifySignature: (address, message, signature) => client.verifyMessage({ address, message, signature }),
     balance: (address) => client.getBalance({ address }),
+
+    async tokenBalances(owner, tokens) {
+      const results = await client.multicall({
+        allowFailure: true,
+        batchSize: 16_384,
+        contracts: tokens.map((address) => ({ address, abi: erc20Abi, functionName: 'balanceOf', args: [owner] }) as const),
+      });
+      const out = new Map<Address, bigint>();
+      tokens.forEach((t, i) => {
+        const r = results[i];
+        if (r.status === 'success') out.set(t, r.result as bigint);
+      });
+      return out;
+    },
+
+    async launchRecords(tokens) {
+      const results = await client.multicall({
+        allowFailure: true,
+        batchSize: 16_384,
+        contracts: tokens.map((t) => ({ address: PONS_V2.launchFactory, abi: ponsFactoryAbi, functionName: 'getLaunchedToken', args: [t] }) as const),
+      });
+      const out = new Map<Address, LaunchRecord>();
+      tokens.forEach((t, i) => {
+        const r = results[i];
+        if (r.status !== 'success') return;
+        const rec = r.result as { exists: boolean; curve: Address; deployer: Address; pairToken: Address; graduationThreshold: bigint };
+        // Launch time isn't on the record; the portfolio only needs it for coins we already index.
+        if (rec.exists) out.set(t, { curve: rec.curve, deployer: rec.deployer, pairToken: rec.pairToken, graduationThreshold: rec.graduationThreshold, launchedAt: null });
+      });
+      return out;
+    },
 
     async launchFromTx(hash) {
       let receipt;
