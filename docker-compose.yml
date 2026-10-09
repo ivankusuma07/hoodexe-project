@@ -1,0 +1,33 @@
+# Local Postgres + Redis for apps/api (Railway runs the same versions in staging/production).
+# Ports are offset so they don't clash with a locally installed Postgres or Redis.
+#
+#   docker compose up -d
+name: hood-exe
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: hood
+      POSTGRES_PASSWORD: hood
+      POSTGRES_DB: hood
+    ports:
+      - '127.0.0.1:54320:5432'
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U hood']
+      interval: 2s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '127.0.0.1:63790:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      retries: 15
+
+volumes:
+  postgres:

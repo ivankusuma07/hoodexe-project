@@ -1,0 +1,106 @@
+import { verifyMessage, type Hash } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { createSiweMessage } from 'viem/siwe';
+import type { RigorBreakdown } from '@hood/shared';
+import { buildApp } from '../app';
+import { connectMemory } from '../db';
+import { loadEnv } from '../env';
+import { memoryKv } from '../kv';
+import type { ChainReader, LaunchOnChain } from '../services/chain';
+import { devPinner } from '../services/pinner';
+import type { Scorer } from '../services/scorer';
+
+// Anvil's well-known dev keys; never funded on mainnet.
+export const alice = privateKeyToAccount('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80');
+export const bob = privateKeyToAccount('0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d');
+
+export const ORIGIN = 'http://localhost:3000';
+
+export const BREAKDOWN: RigorBreakdown = {
+  score: 91,
+  parts: { wellFormed: 25, status: 33, significance: 22, clarity: 11 },
+  statusLabel: 'proven',
+  reasoning: "Euler's identity, a classical result.",
+};
+
+export async function setup(opts: { scorer?: Scorer; launches?: Map<string, LaunchOnChain | 'pending' | null> } = {}) {
+  const { db, close } = await connectMemory();
+  let clock = new Date('2026-10-09T12:00:00Z').getTime();
+  const scorerCalls: string[] = [];
+  const scorer: Scorer = opts.scorer ?? {
+    score: async (_name, statement) => {
+      scorerCalls.push(statement);
+      return { breakdown: BREAKDOWN, model: 'test-model' };
+    },
+  };
+  const launches = opts.launches ?? new Map();
+  const chain: ChainReader = {
+    verifySignature: (address, message, signature) => verifyMessage({ address, message, signature }),
+    launchFromTx: async (hash) => launches.get(hash.toLowerCase()) ?? null,
+  };
+  const pinner = devPinner();
+  const app = await buildApp({
+    env: loadEnv({ NODE_ENV: 'test', DATABASE_URL: 'memory', CORS_ORIGINS: ORIGIN }),
+    db,
+    kv: memoryKv(() => clock),
+    scorer,
+    pinner,
+    chain,
+    now: () => new Date(clock),
+  });
+  return {
+    app,
+    db,
+    pinner,
+    scorerCalls,
+    launches,
+    advance: (ms: number) => void (clock += ms),
+    now: () => new Date(clock),
+    close: async () => {
+      await app.close();
+      await close();
+    },
+  };
+}
+
+type Ctx = Awaited<ReturnType<typeof setup>>;
+type Account = typeof alice;
+
+export async function siweMessage(ctx: Ctx, account: Account, overrides: Partial<Parameters<typeof createSiweMessage>[0]> = {}) {
+  const { nonce } = (await ctx.app.inject({ method: 'GET', url: '/auth/siwe' })).json<{ nonce: string }>();
+  return createSiweMessage({
+    domain: 'localhost:3000',
+    address: account.address,
+    statement: 'Sign in to hood.exe',
+    uri: ORIGIN,
+    version: '1',
+    chainId: 4663,
+    nonce,
+    issuedAt: ctx.now(),
+    ...overrides,
+  });
+}
+
+/** Signs in and returns the Cookie header for later requests. */
+export async function signIn(ctx: Ctx, account: Account = alice): Promise<string> {
+  const message = await siweMessage(ctx, account);
+  const res = await ctx.app.inject({
+    method: 'POST',
+    url: '/auth/siwe',
+    payload: { message, signature: await account.signMessage({ message }) },
+  });
+  if (res.statusCode !== 200) throw new Error(`sign-in failed: ${res.body}`);
+  const cookie = res.cookies.find((c) => c.name === 'hood_session');
+  return `hood_session=${cookie!.value}`;
+}
+
+export async function multipart(fields: Record<string, string | Blob>) {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(fields)) form.append(k, v);
+  const res = new Response(form);
+  return { payload: Buffer.from(await res.arrayBuffer()), headers: { 'content-type': res.headers.get('content-type')! } };
+}
+
+export const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+
+export const txHash = (n: number): Hash => `0x${n.toString(16).padStart(64, '0')}`;
