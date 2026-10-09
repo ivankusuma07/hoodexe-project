@@ -72,6 +72,9 @@ export const tokens = pgTable(
     tokenReserve: numeric('token_reserve', { precision: 78, scale: 0 }),
     realQuoteReserve: numeric('real_quote_reserve', { precision: 78, scale: 0 }),
     stateUpdatedAt: timestamp('state_updated_at', { withTimezone: true }),
+    /** Gross quote traded over the last ~24 h (hourly candles), when the indexer is available. */
+    volume24h: numeric('volume_24h', { precision: 78, scale: 0 }),
+    trades24h: integer('trades_24h'),
   },
   (t) => [index('tokens_block_idx').on(t.blockNumber), index('tokens_hood_idx').on(t.hood, t.blockNumber)],
 );

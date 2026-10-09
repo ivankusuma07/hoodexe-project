@@ -15,6 +15,13 @@
       "when": 1791532686911,
       "tag": "0001_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791537297804,
+      "tag": "0002_volume",
+      "breakpoints": true
     }
   ]
 }

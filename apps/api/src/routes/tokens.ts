@@ -1,21 +1,34 @@
 import type { FastifyInstance } from 'fastify';
-import { and, asc, count, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { asc, count, desc, eq, sql, type SQL } from 'drizzle-orm';
 import { formatUnits, isAddress } from 'viem';
 import { z } from 'zod';
 import { PONS_TOTAL_SUPPLY, findPair } from '@hood/shared';
 import { HttpError } from '../app';
-import { schema } from '../db';
+import { schema, type Db } from '../db';
+import type { EnvioCandle } from '../services/envio';
 
 const CACHE_MS = 10_000;
 
 const query = z.object({
   tab: z.enum(['all', 'hood']).default('all'),
-  sort: z.enum(['latest', 'mcap', 'rigor']).default('latest'),
+  sort: z.enum(['latest', 'volume', 'mcap', 'rigor']).default('latest'),
   limit: z.coerce.number().int().min(1).max(60).default(36),
   offset: z.coerce.number().int().min(0).max(5_000).default(0),
 });
 
+/** Chart intervals (docs/BRIEF.md §5.4). 15m is built from 5m candles; the indexer stores the rest. */
+export const CHART_INTERVALS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3_600, '1d': 86_400 } as const;
+
+const candleQuery = z.object({
+  interval: z.enum(Object.keys(CHART_INTERVALS) as [keyof typeof CHART_INTERVALS]).default('5m'),
+  limit: z.coerce.number().int().min(1).max(500).default(200),
+});
+
+const tradeQuery = z.object({ limit: z.coerce.number().int().min(1).max(50).default(50) });
+
 type TokenRow = typeof schema.tokens.$inferSelect;
+
+const units = (raw: bigint | string | null, decimals: number) => (raw == null ? null : Number(formatUnits(BigInt(raw), decimals)));
 
 /**
  * Display numbers in pair-asset units. Prices are floats on purpose: they are only shown, never used to
@@ -25,7 +38,7 @@ export function toItem(row: TokenRow) {
   const pair = findPair(row.pairToken);
   const decimals = pair?.decimals ?? 18;
   const onCurve = row.phase === 0 && row.quoteReserve != null && row.tokenReserve != null && BigInt(row.tokenReserve) > 0n;
-  const price = onCurve ? Number(formatUnits(BigInt(row.quoteReserve!), decimals)) / Number(formatUnits(BigInt(row.tokenReserve!), 18)) : null;
+  const price = onCurve ? units(row.quoteReserve, decimals)! / units(row.tokenReserve, 18)! : null;
   const threshold = BigInt(row.graduationThreshold);
   const raised = row.realQuoteReserve != null ? BigInt(row.realQuoteReserve) : null;
   return {
@@ -46,6 +59,9 @@ export function toItem(row: TokenRow) {
     marketCap: price != null ? price * Number(PONS_TOTAL_SUPPLY) : null,
     /** Share of the graduation threshold raised, 0–1; 1 once the curve is done. */
     progress: row.phase > 0 ? 1 : raised != null && threshold > 0n ? Math.min(1, Number((raised * 10_000n) / threshold) / 10_000) : null,
+    /** Pair asset traded over ~24 h; null without the indexer. */
+    volume24h: units(row.volume24h, decimals),
+    trades24h: row.trades24h,
     launchedAt: row.launchedAt.toISOString(),
     stateUpdatedAt: row.stateUpdatedAt?.toISOString() ?? null,
   };
@@ -53,37 +69,74 @@ export function toItem(row: TokenRow) {
 
 export type TokenItem = ReturnType<typeof toItem>;
 
-/** GET /tokens (Explore) and GET /tokens/:address (docs/BRIEF.md §9). */
+/** Indexer prices are raw quote units per raw token unit; this is pair asset per whole token. */
+export const toPairPrice = (raw: string, pairDecimals: number) => Number(raw) * 10 ** (18 - pairDecimals);
+
+/** Merges consecutive candles into `size`-second buckets (15m from 5m). Input oldest first. */
+export function mergeCandles(candles: EnvioCandle[], size: number): EnvioCandle[] {
+  const out: EnvioCandle[] = [];
+  for (const c of candles) {
+    const bucketStart = c.bucketStart - (c.bucketStart % size);
+    const last = out.at(-1);
+    if (last && last.bucketStart === bucketStart) {
+      if (Number(c.high) > Number(last.high)) last.high = c.high;
+      if (Number(c.low) < Number(last.low)) last.low = c.low;
+      last.close = c.close;
+      last.volumeQuote += c.volumeQuote;
+      last.trades += c.trades;
+    } else {
+      out.push({ ...c, bucketStart });
+    }
+  }
+  return out;
+}
+
+async function findToken(db: Db, address: string): Promise<TokenRow> {
+  if (!isAddress(address, { strict: false })) throw new HttpError(400, 'Invalid token address.');
+  const [row] = await db
+    .select()
+    .from(schema.tokens)
+    .where(sql`lower(${schema.tokens.tokenAddress}) = ${address.toLowerCase()}`)
+    .limit(1);
+  if (!row) throw new HttpError(404, 'hood.exe has not indexed this token yet.');
+  return row;
+}
+
+/** GET /tokens (Explore), GET /tokens/:address (+ /candles, /trades) (docs/BRIEF.md §9). */
 export async function tokenRoutes(app: FastifyInstance) {
-  const { db } = app.deps;
+  const { db, envio } = app.deps;
   const cache = new Map<string, { at: number; body: unknown }>();
-  const cached = async <T>(key: string, load: () => Promise<T>): Promise<T> => {
+  const cached = async <T>(key: string, ttl: number, load: () => Promise<T>): Promise<T> => {
     const now = Date.now();
     const hit = cache.get(key);
-    if (hit && now - hit.at < CACHE_MS) return hit.body as T;
+    if (hit && now - hit.at < ttl) return hit.body as T;
     const body = await load();
     cache.set(key, { at: now, body });
-    if (cache.size > 500) cache.delete(cache.keys().next().value!);
+    if (cache.size > 1_000) cache.delete(cache.keys().next().value!);
     return body;
+  };
+  const needEnvio = () => {
+    if (!envio) throw new HttpError(503, 'Charts and trades need the indexer, which is not configured.');
+    return envio;
   };
 
   app.get('/tokens', async (req) => {
     const q = query.parse(req.query);
-    return cached(JSON.stringify(q), async () => {
+    return cached(JSON.stringify(q), CACHE_MS, async () => {
       const where = q.tab === 'hood' ? eq(schema.tokens.hood, true) : undefined;
-      // Market cap across pairs isn't comparable without USD prices (Phase 2). Every Pons curve has the
-      // same shape relative to its threshold, so ranking by progress ranks by market cap within a pair
-      // and puts graduated coins first.
+      // Amounts across pairs aren't comparable without USD prices (Phase 2). Pons sizes each pair's
+      // graduation threshold to a similar value, and every curve has the same shape relative to it, so
+      // ranking by amount ÷ threshold compares coins across pairs.
+      const perThreshold = (column: typeof schema.tokens.volume24h | typeof schema.tokens.realQuoteReserve) =>
+        sql`(${column} / nullif(${schema.tokens.graduationThreshold}, 0)) desc nulls last`;
       const order: SQL[] =
-        q.sort === 'mcap'
-          ? [
-              desc(sql`${schema.tokens.phase} > 0`),
-              sql`(${schema.tokens.realQuoteReserve} / nullif(${schema.tokens.graduationThreshold}, 0)) desc nulls last`,
-              desc(schema.tokens.blockNumber),
-            ]
-          : q.sort === 'rigor'
-            ? [sql`${schema.tokens.rigorScore} desc nulls last`, desc(schema.tokens.blockNumber)]
-            : [desc(schema.tokens.blockNumber), asc(schema.tokens.tokenAddress)];
+        q.sort === 'volume'
+          ? [perThreshold(schema.tokens.volume24h), desc(schema.tokens.blockNumber)]
+          : q.sort === 'mcap'
+            ? [desc(sql`${schema.tokens.phase} > 0`), perThreshold(schema.tokens.realQuoteReserve), desc(schema.tokens.blockNumber)]
+            : q.sort === 'rigor'
+              ? [sql`${schema.tokens.rigorScore} desc nulls last`, desc(schema.tokens.blockNumber)]
+              : [desc(schema.tokens.blockNumber), asc(schema.tokens.tokenAddress)];
       const [rows, [{ total }], [{ hoodCount }]] = await Promise.all([
         db
           .select()
@@ -95,21 +148,62 @@ export async function tokenRoutes(app: FastifyInstance) {
         db.select({ total: count() }).from(schema.tokens).where(where),
         db.select({ hoodCount: count() }).from(schema.tokens).where(eq(schema.tokens.hood, true)),
       ]);
-      return { items: rows.map(toItem), total, hoodCount, offset: q.offset };
+      return { items: rows.map(toItem), total, hoodCount, offset: q.offset, volume: envio != null };
     });
   });
 
-  app.get<{ Params: { address: string } }>('/tokens/:address', async (req) => {
-    const address = req.params.address;
-    if (!isAddress(address, { strict: false })) throw new HttpError(400, 'Invalid token address.');
-    return cached(`token:${address.toLowerCase()}`, async () => {
-      const [row] = await db
-        .select()
-        .from(schema.tokens)
-        .where(and(sql`lower(${schema.tokens.tokenAddress}) = ${address.toLowerCase()}`))
-        .limit(1);
-      if (!row) throw new HttpError(404, 'hood.exe has not indexed this token yet.');
+  app.get<{ Params: { address: string } }>('/tokens/:address', async (req) =>
+    cached(`token:${req.params.address.toLowerCase()}`, CACHE_MS, async () => {
+      const row = await findToken(db, req.params.address);
       return { ...toItem(row), deployer: row.deployer, description: row.description, metadataCid: row.metadataCid };
+    }),
+  );
+
+  app.get<{ Params: { address: string } }>('/tokens/:address/candles', async (req) => {
+    const q = candleQuery.parse(req.query);
+    return cached(`candles:${req.params.address.toLowerCase()}:${q.interval}:${q.limit}`, CACHE_MS, async () => {
+      const source = needEnvio();
+      const row = await findToken(db, req.params.address);
+      const decimals = findPair(row.pairToken)?.decimals ?? 18;
+      const seconds = CHART_INTERVALS[q.interval];
+      const raw =
+        seconds === 900
+          ? mergeCandles(await source.candles(row.tokenAddress, 300, q.limit * 3), 900).slice(-q.limit)
+          : await source.candles(row.tokenAddress, seconds, q.limit);
+      return {
+        interval: q.interval,
+        candles: raw.map((c) => ({
+          time: c.bucketStart,
+          open: toPairPrice(c.open, decimals),
+          high: toPairPrice(c.high, decimals),
+          low: toPairPrice(c.low, decimals),
+          close: toPairPrice(c.close, decimals),
+          volume: units(c.volumeQuote, decimals)!,
+          trades: c.trades,
+        })),
+      };
+    });
+  });
+
+  app.get<{ Params: { address: string } }>('/tokens/:address/trades', async (req) => {
+    const q = tradeQuery.parse(req.query);
+    return cached(`trades:${req.params.address.toLowerCase()}:${q.limit}`, 4_000, async () => {
+      const source = needEnvio();
+      const row = await findToken(db, req.params.address);
+      const decimals = findPair(row.pairToken)?.decimals ?? 18;
+      const trades = await source.trades(row.tokenAddress, q.limit);
+      return {
+        trades: trades.map((t) => ({
+          id: t.id,
+          trader: t.trader,
+          side: t.isBuy ? ('buy' as const) : ('sell' as const),
+          quote: units(t.quoteAmount, decimals)!,
+          tokens: units(t.tokenAmount, 18)!,
+          price: toPairPrice(t.price, decimals),
+          time: t.timestamp,
+          txHash: t.txHash,
+        })),
+      };
     });
   });
 }

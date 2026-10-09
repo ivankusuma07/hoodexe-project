@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseEther, type Address } from 'viem';
 import { NATIVE_PAIR, buildDescription } from '@hood/shared';
 import { schema } from './db';
-import { envioLaunchSource, tokenIndex, type CurveState, type LaunchSource, type RawLaunch, type TokenMetadata } from './services/tokenIndex';
+import { envioClient, envioLaunchSource, type EnvioClient } from './services/envio';
+import { tokenIndex, type CurveState, type LaunchSource, type RawLaunch, type TokenMetadata } from './services/tokenIndex';
 import { setup } from './test/helpers';
 
 type Ctx = Awaited<ReturnType<typeof setup>>;
@@ -146,7 +147,7 @@ describe('envioLaunchSource', () => {
     const f = fakeSource();
     for (const n of [2, 3, 4]) f.launch(n, 600 + n); // metadata for the tokens Envio will report
     const requests = stubEnvio([row(2, 602), row(3, 603), row(4, 604), row(5, 1_200)], 1_000);
-    const source = envioLaunchSource('http://envio.test/v1/graphql', f.source, 2);
+    const source = envioLaunchSource(envioClient('http://envio.test/v1/graphql', 2), f.source);
 
     expect(await source.latestBlock()).toBe(1_000);
     const launches = await source.launches(600, 1_000);
@@ -161,9 +162,9 @@ describe('envioLaunchSource', () => {
 
   it('surfaces GraphQL errors and a chain Envio has not reached', async () => {
     vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ errors: [{ message: 'field "Token" not found' }] })));
-    await expect(envioLaunchSource('http://envio.test', fakeSource().source).launches(0, 1)).rejects.toThrow(/field "Token" not found/);
+    await expect(envioLaunchSource(envioClient('http://envio.test'), fakeSource().source).launches(0, 1)).rejects.toThrow(/field "Token" not found/);
     vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ data: { chain_metadata: [{ chain_id: 4663, latest_processed_block: null }] } })));
-    await expect(envioLaunchSource('http://envio.test', fakeSource().source).latestBlock()).rejects.toThrow(/not indexed/);
+    await expect(envioLaunchSource(envioClient('http://envio.test'), fakeSource().source).latestBlock()).rejects.toThrow(/not indexed/);
   });
 });
 
@@ -210,7 +211,7 @@ describe('GET /tokens', () => {
   it('pages and validates its query', async () => {
     await seed();
     expect((await get('?limit=1&offset=1')).items.map((i: { symbol: string }) => i.symbol)).toEqual(['C2']);
-    expect((await ctx.app.inject({ method: 'GET', url: '/tokens?sort=volume' })).statusCode).toBe(400);
+    expect((await ctx.app.inject({ method: 'GET', url: '/tokens?sort=hype' })).statusCode).toBe(400);
     expect((await ctx.app.inject({ method: 'GET', url: '/tokens?limit=500' })).statusCode).toBe(400);
   });
 
@@ -220,5 +221,105 @@ describe('GET /tokens', () => {
     expect(res.json()).toMatchObject({ symbol: 'C1', statement: STATEMENT, metadataCid: 'bafy', deployer: addr(1) });
     expect((await ctx.app.inject({ method: 'GET', url: `/tokens/${addr(99)}` })).statusCode).toBe(404);
     expect((await ctx.app.inject({ method: 'GET', url: '/tokens/nope' })).statusCode).toBe(400);
+  });
+});
+
+describe('indexer-backed volume, candles and trades', () => {
+  /** An EnvioClient stand-in with canned candles, trades and per-token 24h activity. */
+  function fakeEnvio(over: Partial<EnvioClient> = {}): EnvioClient {
+    return {
+      latestBlock: async () => 1_000,
+      launches: async () => [],
+      activity: async () => new Map(),
+      candles: async () => [],
+      trades: async () => [],
+      ...over,
+    };
+  }
+
+  async function seedWithEnvio(envio: EnvioClient) {
+    await ctx.close();
+    ctx = await setup({ envio });
+    const f = fakeSource();
+    f.launch(1, 600);
+    f.launch(2, 700, {}, USDG);
+    f.launch(3, 800);
+    for (const n of [1, 2, 3]) f.state.set(addr(n), { phase: 0, quoteReserve: parseEther('2'), tokenReserve: parseEther('800000000'), realQuoteReserve: 0n });
+    const source: LaunchSource = { ...f.source, activity: (tokens, since) => envio.activity(tokens, since) };
+    const index = tokenIndex(ctx.db, source, { ...opts, refreshRecent: 10 });
+    await index.sync();
+    await index.refresh();
+  }
+
+  it('stores 24h volume and ranks it against each curve’s threshold', async () => {
+    let asked: { tokens: Address[]; since: number } | undefined;
+    await seedWithEnvio(
+      fakeEnvio({
+        activity: async (tokens, since) => {
+          asked = { tokens, since };
+          return new Map([
+            [addr(1), { volume: parseEther('0.42'), trades: 12 }], // 10% of 4.2 ETH
+            [addr(2), { volume: 4_045_000_000n, trades: 3 }], // 50% of 8,090 USDG
+          ]);
+        },
+      }),
+    );
+    expect(asked!.tokens).toHaveLength(3);
+    expect(asked!.since % 3_600).toBe(0);
+    const body = await ctx.app.inject({ method: 'GET', url: '/tokens?sort=volume' }).then((r) => r.json());
+    expect(body.items.map((i: { symbol: string }) => i.symbol)).toEqual(['C2', 'C1', 'C3']);
+    expect(body.items[0]).toMatchObject({ volume24h: 4045, trades24h: 3 });
+    expect(body.items[1]).toMatchObject({ volume24h: 0.42, trades24h: 12 });
+    expect(body.items[2]).toMatchObject({ volume24h: 0, trades24h: 0 });
+  });
+
+  it('serves candles in pair units per whole token, and builds 15m from 5m', async () => {
+    const raw = (bucketStart: number, o: string, h: string, l: string, c: string, v: bigint) => ({ bucketStart, open: o, high: h, low: l, close: c, volumeQuote: v, trades: 1 });
+    let asked: [string, number, number] | undefined;
+    await seedWithEnvio(
+      fakeEnvio({
+        candles: async (token, interval, limit) => {
+          asked = [token, interval, limit];
+          // USDG (6 decimals): a raw ratio of 1e-15 is 0.001 USDG per whole token.
+          return [raw(900, '1e-15', '3e-15', '1e-15', '2e-15', 1_000_000n), raw(1_200, '2e-15', '2e-15', '5e-16', '5e-16', 2_000_000n), raw(1_800, '4e-15', '4e-15', '4e-15', '4e-15', 500_000n)];
+        },
+      }),
+    );
+    const body = await ctx.app.inject({ method: 'GET', url: `/tokens/${addr(2)}/candles?interval=15m&limit=2` }).then((r) => r.json());
+    expect(asked).toEqual([addr(2), 300, 6]);
+    expect(body.interval).toBe('15m');
+    expect(body.candles).toHaveLength(2);
+    const [first, second] = body.candles;
+    expect(first.time).toBe(900);
+    expect(first.open).toBeCloseTo(0.001, 12);
+    expect(first.high).toBeCloseTo(0.003, 12);
+    expect(first.low).toBeCloseTo(0.0005, 12);
+    expect(first.close).toBeCloseTo(0.0005, 12);
+    expect(first.volume).toBeCloseTo(3, 9);
+    expect(first.trades).toBe(2);
+    expect(second.time).toBe(1_800);
+
+    expect((await ctx.app.inject({ method: 'GET', url: `/tokens/${addr(2)}/candles?interval=2m` })).statusCode).toBe(400);
+  });
+
+  it('serves recent trades in display units', async () => {
+    await seedWithEnvio(
+      fakeEnvio({
+        trades: async () => [
+          { id: '9-1', trader: addr(7), isBuy: true, quoteAmount: parseEther('0.05'), tokenAmount: parseEther('25000000'), price: '2e-9', timestamp: 1_791_500_000, txHash: '0xabc' },
+        ],
+      }),
+    );
+    const body = await ctx.app.inject({ method: 'GET', url: `/tokens/${addr(1)}/trades` }).then((r) => r.json());
+    expect(body.trades).toEqual([{ id: '9-1', trader: addr(7), side: 'buy', quote: 0.05, tokens: 25_000_000, price: 2e-9, time: 1_791_500_000, txHash: '0xabc' }]);
+  });
+
+  it('answers 503 for charts and trades without the indexer', async () => {
+    const f = fakeSource();
+    f.launch(1, 900);
+    await tokenIndex(ctx.db, f.source, opts).sync();
+    const res = await ctx.app.inject({ method: 'GET', url: `/tokens/${addr(1)}/candles` });
+    expect(res.statusCode).toBe(503);
+    expect((await ctx.app.inject({ method: 'GET', url: `/tokens/${addr(1)}/trades` })).statusCode).toBe(503);
   });
 });

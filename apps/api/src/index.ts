@@ -6,15 +6,19 @@ import { memoryKv, redisKv } from './kv';
 import { rpcChainReader } from './services/chain';
 import { devPinner, pinataPinner } from './services/pinner';
 import { deepseekScorer, offlineScorer } from './services/scorer';
-import { envioLaunchSource, rpcLaunchSource, tokenIndex } from './services/tokenIndex';
+import { envioClient, envioLaunchSource } from './services/envio';
+import { rpcLaunchSource, tokenIndex } from './services/tokenIndex';
 
 const env = loadEnv();
 const { db, close: closeDb } = await connectPostgres(env.DATABASE_URL);
 const kv = env.REDIS_URL ? redisKv(new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2 })) : memoryKv();
 
+const envio = env.ENVIO_GRAPHQL_URL ? envioClient(env.ENVIO_GRAPHQL_URL) : undefined;
+
 const app = await buildApp({
   env,
   db,
+  envio,
   kv,
   chain: rpcChainReader(env.RPC_URL_SERVER),
   scorer: env.DEEPSEEK_API_KEY
@@ -29,7 +33,7 @@ if (standIns.length) app.log.warn(`Running with stand-ins: ${standIns.join(', ')
 const rpcSource = rpcLaunchSource(env.RPC_URL_SERVER);
 const index =
   env.TOKEN_INDEX === 'on'
-    ? tokenIndex(db, env.ENVIO_GRAPHQL_URL ? envioLaunchSource(env.ENVIO_GRAPHQL_URL, rpcSource) : rpcSource, {
+    ? tokenIndex(db, envio ? envioLaunchSource(envio, rpcSource) : rpcSource, {
         backfillBlocks: env.TOKEN_INDEX_BACKFILL_BLOCKS,
         // Envio pages internally; raw log scans are capped by the RPC's response limit.
         chunkBlocks: env.ENVIO_GRAPHQL_URL ? 5_000_000 : 500_000,

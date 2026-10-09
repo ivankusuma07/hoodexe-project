@@ -1,7 +1,6 @@
 import { and, desc, eq, inArray, lt, or } from 'drizzle-orm';
 import { createPublicClient, decodeEventLog, erc20Abi, http, toEventSelector, type Address, type Hex } from 'viem';
-import { z } from 'zod';
-import { PONS_V2, PUBLIC_RPC_MAINNET, ROBINHOOD_CHAIN_ID, parseDescription, ponsCurveAbi, ponsFactoryAbi, ponsTokenAbi, robinhoodChain } from '@hood/shared';
+import { PONS_V2, PUBLIC_RPC_MAINNET, parseDescription, ponsCurveAbi, ponsFactoryAbi, ponsTokenAbi, robinhoodChain } from '@hood/shared';
 import { schema, type Db } from '../db';
 import { storedScore } from '../routes/score';
 
@@ -18,13 +17,17 @@ export type RawLaunch = {
 export type TokenMetadata = { name: string; symbol: string; logo: string; description: string };
 export type CurveState = { phase: number; quoteReserve: bigint; tokenReserve: bigint; realQuoteReserve: bigint };
 
-/** Where launches come from. RPC today; Envio replaces it without touching the index or the routes. */
+/** Where launches come from: the Envio indexer (services/envio.ts) or, locally, raw RPC logs. */
 export interface LaunchSource {
   latestBlock(): Promise<number>;
   launches(fromBlock: number, toBlock: number): Promise<RawLaunch[]>;
   metadata(tokens: Address[]): Promise<Map<Address, TokenMetadata>>;
   state(items: { token: Address; curve: Address }[]): Promise<Map<Address, CurveState>>;
+  /** Gross quote volume and trade count since a unix time. Needs trade history, so Envio only. */
+  activity?(tokens: Address[], since: number): Promise<Map<Address, Activity>>;
 }
+
+export type Activity = { volume: bigint; trades: number };
 
 const TOKEN_LAUNCHED_TOPIC = toEventSelector(ponsFactoryAbi.find((x) => x.type === 'event' && x.name === 'TokenLaunched')!);
 
@@ -108,78 +111,6 @@ export function rpcLaunchSource(rpcUrl: string = PUBLIC_RPC_MAINNET): LaunchSour
       });
       return out;
     },
-  };
-}
-
-const envioTokenSchema = z.object({
-  id: z.string(),
-  curve: z.string(),
-  deployer: z.string(),
-  pairToken: z.string(),
-  graduationThreshold: z.coerce.bigint(),
-  launchBlock: z.number().int(),
-  launchedAt: z.number().int(),
-});
-
-/**
- * Launch discovery from the Envio indexer's GraphQL (apps/indexer); token metadata and live curve state
- * still come from the RPC, which only needs eth_call (fine on a free-tier provider, unlike eth_getLogs).
- */
-export function envioLaunchSource(graphqlUrl: string, rpc: LaunchSource, pageSize = 1_000): LaunchSource {
-  async function query<T>(query: string, variables: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
-    const res = await fetch(graphqlUrl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ query, variables }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) throw new Error(`Envio GraphQL answered ${res.status}`);
-    const body = (await res.json()) as { data?: unknown; errors?: { message: string }[] };
-    if (body.errors?.length) throw new Error(`Envio GraphQL: ${body.errors[0].message}`);
-    return schema.parse(body.data);
-  }
-
-  return {
-    async latestBlock() {
-      const data = await query(
-        '{ chain_metadata { chain_id latest_processed_block } }',
-        {},
-        z.object({ chain_metadata: z.array(z.object({ chain_id: z.number(), latest_processed_block: z.number().nullable() })) }),
-      );
-      const chain = data.chain_metadata.find((c) => c.chain_id === ROBINHOOD_CHAIN_ID);
-      if (chain?.latest_processed_block == null) throw new Error('Envio has not indexed Robinhood Chain yet');
-      return chain.latest_processed_block;
-    },
-
-    async launches(fromBlock, toBlock) {
-      const out: RawLaunch[] = [];
-      for (let offset = 0; ; offset += pageSize) {
-        const { Token: page } = await query(
-          `query Launches($from: Int!, $to: Int!, $limit: Int!, $offset: Int!) {
-            Token(where: { launchBlock: { _gte: $from, _lte: $to } }, order_by: [{ launchBlock: asc }, { id: asc }], limit: $limit, offset: $offset) {
-              id curve deployer pairToken graduationThreshold launchBlock launchedAt
-            }
-          }`,
-          { from: fromBlock, to: toBlock, limit: pageSize, offset },
-          z.object({ Token: z.array(envioTokenSchema) }),
-        );
-        for (const t of page) {
-          out.push({
-            token: t.id as Address,
-            curve: t.curve as Address,
-            deployer: t.deployer as Address,
-            pairToken: t.pairToken as Address,
-            graduationThreshold: t.graduationThreshold,
-            blockNumber: t.launchBlock,
-            timestamp: new Date(t.launchedAt * 1000),
-          });
-        }
-        if (page.length < pageSize) return out;
-      }
-    },
-
-    metadata: (tokens) => rpc.metadata(tokens),
-    state: (items) => rpc.state(items),
   };
 }
 
@@ -298,6 +229,18 @@ export function tokenIndex(db: Db, source: LaunchSource, opts: TokenIndexOptions
             stateUpdatedAt: now,
           })
           .where(eq(schema.tokens.tokenAddress, r.token));
+      }
+      if (source.activity) {
+        // The last 24 whole hours of candles, plus the hour in progress.
+        const since = Math.floor(now.getTime() / 3_600_000) * 3_600 - 23 * 3_600;
+        const activity = await source.activity(
+          rows.map((r) => r.token as Address),
+          since,
+        );
+        for (const r of rows) {
+          const a = activity.get(r.token as Address) ?? { volume: 0n, trades: 0 };
+          await db.update(schema.tokens).set({ volume24h: a.volume.toString(), trades24h: a.trades }).where(eq(schema.tokens.tokenAddress, r.token));
+        }
       }
       // A hood.exe statement can be scored after the launch was indexed (e.g. a re-score).
       const unscored = rows.filter((r) => r.hood && r.statement && r.rigorScore == null);

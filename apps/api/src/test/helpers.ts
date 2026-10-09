@@ -7,6 +7,7 @@ import { connectMemory } from '../db';
 import { loadEnv } from '../env';
 import { memoryKv } from '../kv';
 import type { ChainReader, LaunchOnChain } from '../services/chain';
+import type { EnvioClient } from '../services/envio';
 import { devPinner } from '../services/pinner';
 import type { Scorer } from '../services/scorer';
 
@@ -23,7 +24,7 @@ export const BREAKDOWN: RigorBreakdown = {
   reasoning: "Euler's identity, a classical result.",
 };
 
-export async function setup(opts: { scorer?: Scorer; launches?: Map<string, LaunchOnChain | 'pending' | null> } = {}) {
+export async function setup(opts: { scorer?: Scorer; launches?: Map<string, LaunchOnChain | 'pending' | null>; envio?: EnvioClient } = {}) {
   const { db, close } = await connectMemory();
   let clock = new Date('2026-10-09T12:00:00Z').getTime();
   const scorerCalls: string[] = [];
@@ -46,6 +47,7 @@ export async function setup(opts: { scorer?: Scorer; launches?: Map<string, Laun
     scorer,
     pinner,
     chain,
+    envio: opts.envio,
     now: () => new Date(clock),
   });
   return {

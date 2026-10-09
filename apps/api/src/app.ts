@@ -8,6 +8,7 @@ import { schema, type Db } from './db';
 import type { Env } from './env';
 import type { Kv } from './kv';
 import type { ChainReader } from './services/chain';
+import type { EnvioClient } from './services/envio';
 import type { Pinner } from './services/pinner';
 import type { Scorer } from './services/scorer';
 import { authRoutes } from './routes/auth';
@@ -23,6 +24,8 @@ export type Deps = {
   scorer: Scorer;
   pinner: Pinner;
   chain: ChainReader;
+  /** The indexer, when ENVIO_GRAPHQL_URL is set: charts, trades, volume. */
+  envio?: EnvioClient;
   now?: () => Date;
 };
 
