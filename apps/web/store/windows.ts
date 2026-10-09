@@ -37,6 +37,8 @@ type WindowStore = {
   minimize: (id: string) => void;
   toggleMaximize: (id: string) => void;
   move: (id: string, x: number, y: number) => void;
+  /** e.g. a Token Detail opened from a link learns its ticker after loading. */
+  rename: (id: string, title: string) => void;
   /** Taskbar button: restore if minimized, minimize if active, else focus. */
   toggleFromTaskbar: (id: string) => void;
 };
@@ -125,6 +127,9 @@ export const useWindows = create<WindowStore>((set, get) => ({
 
   move: (id, x, y) =>
     set((s) => ({ windows: s.windows.map((w) => (w.id === id ? { ...w, x, y } : w)) })),
+
+  rename: (id, title) =>
+    set((s) => (s.windows.some((w) => w.id === id && w.title !== title) ? { windows: s.windows.map((w) => (w.id === id ? { ...w, title } : w)) } : s)),
 
   toggleFromTaskbar: (id) => {
     const { windows, activeId, minimize, focus } = get();

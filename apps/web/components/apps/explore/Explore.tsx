@@ -18,9 +18,9 @@ const PAGE = 36;
 /** Explore opens on "All Pons" until hood.exe has this many launches (docs/BRIEF.md §5.3). */
 const HOOD_TAB_MIN = 12;
 
-const SORTS: { id: TokenQuery['sort'] | 'volume'; label: string; disabled?: string }[] = [
+const SORTS: { id: TokenQuery['sort']; label: string; needsIndexer?: boolean }[] = [
   { id: 'latest', label: 'Latest' },
-  { id: 'volume', label: 'Volume', disabled: 'Volume needs trade history from the indexer' },
+  { id: 'volume', label: 'Volume', needsIndexer: true },
   { id: 'rigor', label: 'Rigor' },
   { id: 'mcap', label: 'MCap' },
 ];
@@ -44,6 +44,8 @@ export function Explore({ win }: { win: WindowState }) {
 
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
   const total = q.data?.pages[0]?.total ?? 0;
+  // Volume needs the indexer; until the first answer says whether it's there, leave the option on.
+  const hasVolume = q.data?.pages[0]?.volume ?? true;
 
   return (
     <div className={styles.explore}>
@@ -63,12 +65,15 @@ export function Explore({ win }: { win: WindowState }) {
         <label className={styles.sort}>
           Sort by:{' '}
           <select value={sort} onChange={(e) => setSort(e.target.value as TokenQuery['sort'])}>
-            {SORTS.map((s) => (
-              <option key={s.id} value={s.id} disabled={!!s.disabled} title={s.disabled}>
-                {s.label}
-                {s.disabled ? ' (soon)' : ''}
-              </option>
-            ))}
+            {SORTS.map((s) => {
+              const off = s.needsIndexer && !hasVolume;
+              return (
+                <option key={s.id} value={s.id} disabled={off} title={off ? 'Needs the indexer' : undefined}>
+                  {s.label}
+                  {off ? ' (unavailable)' : ''}
+                </option>
+              );
+            })}
           </select>
         </label>
       </div>
@@ -88,7 +93,7 @@ export function Explore({ win }: { win: WindowState }) {
         ) : (
           <ul className={styles.grid}>
             {items.map((t) => (
-              <TokenCard key={t.token} token={t} />
+              <TokenCard key={t.token} token={t} showVolume={sort === 'volume'} />
             ))}
           </ul>
         )}
@@ -106,7 +111,7 @@ export function Explore({ win }: { win: WindowState }) {
   );
 }
 
-function TokenCard({ token: t }: { token: TokenItem }) {
+function TokenCard({ token: t, showVolume }: { token: TokenItem; showVolume: boolean }) {
   const open = () => openToken(t.token, t.symbol);
   return (
     <li>
@@ -132,7 +137,7 @@ function TokenCard({ token: t }: { token: TokenItem }) {
         </div>
         <div className={styles.snippet}>{t.hood && t.statement ? <Latex source={t.statement} /> : <span className={styles.plain}>{t.blurb}</span>}</div>
         <div className={styles.stats}>
-          <span>MC {formatQuote(t.marketCap, t.pair.symbol)}</span>
+          <span>{showVolume ? `24h ${formatQuote(t.volume24h, t.pair.symbol)}` : `MC ${formatQuote(t.marketCap, t.pair.symbol)}`}</span>
           <span>{t.phase === 0 ? formatPercent(t.progress) : PHASE_LABEL[t.phase]}</span>
         </div>
         <ProgressBar value={(t.progress ?? 0) * 100} label={`Graduation progress for $${t.symbol}`} />

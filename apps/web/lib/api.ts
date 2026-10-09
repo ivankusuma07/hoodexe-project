@@ -97,15 +97,18 @@ const tokenItemSchema = z.object({
   price: z.number().nullable(),
   marketCap: z.number().nullable(),
   progress: z.number().nullable(),
+  volume24h: z.number().nullable(),
+  trades24h: z.number().nullable(),
   launchedAt: z.string(),
   stateUpdatedAt: z.string().nullable(),
 });
 export type TokenItem = z.infer<typeof tokenItemSchema>;
 
-const tokenPageSchema = z.object({ items: z.array(tokenItemSchema), total: z.number(), hoodCount: z.number(), offset: z.number() });
+/** 'volume' is false when the API has no indexer, so Volume sort and charts are unavailable. */
+const tokenPageSchema = z.object({ items: z.array(tokenItemSchema), total: z.number(), hoodCount: z.number(), offset: z.number(), volume: z.boolean() });
 export type TokenPage = z.infer<typeof tokenPageSchema>;
 
-export type TokenQuery = { tab: 'all' | 'hood'; sort: 'latest' | 'mcap' | 'rigor'; limit: number; offset: number };
+export type TokenQuery = { tab: 'all' | 'hood'; sort: 'latest' | 'volume' | 'mcap' | 'rigor'; limit: number; offset: number };
 
 /** GET /tokens: Explore's grid. */
 export function fetchTokens(q: TokenQuery): Promise<TokenPage> {
@@ -119,4 +122,39 @@ export type TokenDetail = z.infer<typeof tokenDetailSchema>;
 /** GET /tokens/:address */
 export function fetchToken(address: string): Promise<TokenDetail> {
   return request(`/tokens/${encodeURIComponent(address)}`, { method: 'GET' }, tokenDetailSchema);
+}
+
+export const CHART_INTERVALS = ['1m', '5m', '15m', '1h', '1d'] as const;
+export type ChartInterval = (typeof CHART_INTERVALS)[number];
+
+const candlesSchema = z.object({
+  interval: z.enum(CHART_INTERVALS),
+  candles: z.array(z.object({ time: z.number(), open: z.number(), high: z.number(), low: z.number(), close: z.number(), volume: z.number(), trades: z.number() })),
+});
+export type Candles = z.infer<typeof candlesSchema>;
+
+/** GET /tokens/:address/candles: prices in the pair asset per whole token, oldest first. */
+export function fetchCandles(address: string, interval: ChartInterval, limit = 200): Promise<Candles> {
+  return request(`/tokens/${encodeURIComponent(address)}/candles?interval=${interval}&limit=${limit}`, { method: 'GET' }, candlesSchema);
+}
+
+const tradesSchema = z.object({
+  trades: z.array(
+    z.object({
+      id: z.string(),
+      trader: z.string(),
+      side: z.enum(['buy', 'sell']),
+      quote: z.number(),
+      tokens: z.number(),
+      price: z.number(),
+      time: z.number(),
+      txHash: z.string(),
+    }),
+  ),
+});
+export type Trade = z.infer<typeof tradesSchema>['trades'][number];
+
+/** GET /tokens/:address/trades: the newest 50, newest first. */
+export function fetchTrades(address: string): Promise<Trade[]> {
+  return request(`/tokens/${encodeURIComponent(address)}/trades?limit=50`, { method: 'GET' }, tradesSchema).then((r) => r.trades);
 }

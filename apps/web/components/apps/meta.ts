@@ -100,8 +100,8 @@ export const APPS: Record<AppId, AppMeta> = {
     label: 'Token',
     description: 'One coin: curve, theorem, links',
     Icon: TheoremIcon,
-    w: 520,
-    h: 460,
+    w: 720,
+    h: 540,
   },
   recycle: {
     id: 'recycle',

@@ -4,7 +4,7 @@ import type { AppId } from './meta';
 import { About } from './About';
 import { ComingSoon } from './ComingSoon';
 import { Explore } from './explore/Explore';
-import { TokenDetail } from './explore/TokenDetail';
+import { TokenDetail } from './token/TokenDetail';
 import { Launch } from './launch/Launch';
 import { Portfolio } from './Portfolio';
 import { RecycleBin } from './RecycleBin';
