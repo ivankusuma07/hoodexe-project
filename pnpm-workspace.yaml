@@ -4,6 +4,7 @@ packages:
 
 allowBuilds:
   bufferutil: false
+  esbuild: false
   keccak: false
   sharp: false
   unrs-resolver: false

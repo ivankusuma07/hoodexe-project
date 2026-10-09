@@ -7,12 +7,15 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:pons": "tsx scripts/check-pons.ts"
   },
   "peerDependencies": {
     "viem": "^2"
   },
   "devDependencies": {
+    "@types/node": "^24.19.1",
+    "tsx": "^4",
     "typescript": "^5",
     "viem": "2.57.4"
   }

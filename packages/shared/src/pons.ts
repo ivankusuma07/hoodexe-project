@@ -17,12 +17,16 @@ export const PONS_V2 = {
 /** Retired; no new launches. V1 tokens are shown read-only. */
 export const PONS_V1_FACTORY: Address = '0xA5aAb3F0c6EeadF30Ef1D3Eb997108E976351feB';
 
+/** Native ETH is the zero address wherever Pons takes a pair token. */
+export const NATIVE_PAIR: Address = '0x0000000000000000000000000000000000000000';
+
 export const PONS_TOTAL_SUPPLY = 1_000_000_000n;
 
 /** `getLaunchedToken().phase` — the only source of truth for a token's phase. */
-export enum LaunchPhase {
-  Curve = 0,
-  Swept = 1,
-  Pool = 2,
-  Rescued = 3,
-}
+export const LaunchPhase = {
+  Curve: 0,
+  Swept: 1,
+  Pool: 2,
+  Rescued: 3,
+} as const;
+export type LaunchPhase = (typeof LaunchPhase)[keyof typeof LaunchPhase];
