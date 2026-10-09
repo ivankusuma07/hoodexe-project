@@ -24,12 +24,15 @@ export interface ChainReader {
   verifySignature(address: Address, message: string, signature: Hex): Promise<boolean>;
   /** The Pons V2 launch in a mined transaction; 'pending' before it is mined, null when it isn't a launch. */
   launchFromTx(hash: Hash): Promise<LaunchOnChain | 'pending' | null>;
+  /** Native ETH balance on 4663 (posting callouts needs a non-zero one, docs/BRIEF.md §10). */
+  balance(address: Address): Promise<bigint>;
 }
 
 export function rpcChainReader(rpcUrl: string = PUBLIC_RPC_MAINNET): ChainReader {
   const client = createPublicClient({ chain: robinhoodChain(rpcUrl), transport: http(rpcUrl, { retryCount: 3 }) });
   return {
     verifySignature: (address, message, signature) => client.verifyMessage({ address, message, signature }),
+    balance: (address) => client.getBalance({ address }),
 
     async launchFromTx(hash) {
       let receipt;

@@ -1,6 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
+import websocket from '@fastify/websocket';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import { ZodError } from 'zod';
 import type { Address } from 'viem';
@@ -9,11 +10,15 @@ import type { Env } from './env';
 import type { Kv } from './kv';
 import type { ChainReader } from './services/chain';
 import type { EnvioClient } from './services/envio';
+import type { Moderator } from './services/moderation';
 import type { Pinner } from './services/pinner';
+import type { PubSub } from './services/pubsub';
 import type { Scorer } from './services/scorer';
 import { authRoutes } from './routes/auth';
+import { calloutRoutes } from './routes/callouts';
 import { ipfsRoutes } from './routes/ipfs';
 import { launchRoutes } from './routes/launches';
+import { liveRoutes } from './routes/live';
 import { scoreRoutes } from './routes/score';
 import { tokenRoutes } from './routes/tokens';
 
@@ -26,6 +31,10 @@ export type Deps = {
   chain: ChainReader;
   /** The indexer, when ENVIO_GRAPHQL_URL is set: charts, trades, volume. */
   envio?: EnvioClient;
+  /** The model step of callout moderation (§10). */
+  moderator: Moderator;
+  /** Live callouts and reactions, from this process and the worker, to the WebSockets. */
+  pubsub: PubSub;
   now?: () => Date;
 };
 
@@ -35,6 +44,8 @@ declare module 'fastify' {
   interface FastifyInstance {
     deps: Deps & { now: () => Date };
     requireSession: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    /** The signed-in wallet, or null; for routes that work for everyone. */
+    sessionWallet: (req: FastifyRequest) => Promise<Address | null>;
   }
   interface FastifyRequest {
     wallet: Address | null;
@@ -65,18 +76,32 @@ export async function buildApp(deps: Deps) {
 
   await app.register(cors, { origin: env.CORS_ORIGINS, credentials: true });
   await app.register(cookie, { secret: env.SESSION_SECRET });
+  // Clients only listen on /ws; 1 KB is plenty for anything a browser might send.
+  await app.register(websocket, { options: { maxPayload: 1_024 } });
 
-  app.decorate('requireSession', async (req: FastifyRequest) => {
+  /** 'none' without a valid signed cookie, 'expired' for an unknown or lapsed session. */
+  async function lookupSession(req: FastifyRequest): Promise<Address | 'none' | 'expired'> {
     const signed = req.cookies[SESSION_COOKIE];
     const unsigned = signed ? req.unsignCookie(signed) : null;
-    if (!unsigned?.valid || !unsigned.value) throw new HttpError(401, 'Sign in with your wallet first.');
+    if (!unsigned?.valid || !unsigned.value) return 'none';
     const [row] = await deps.db
       .select({ wallet: schema.sessions.wallet })
       .from(schema.sessions)
       .where(and(eq(schema.sessions.id, unsigned.value), gt(schema.sessions.expiresAt, app.deps.now())))
       .limit(1);
-    if (!row) throw new HttpError(401, 'Your session expired. Sign in again.');
-    req.wallet = row.wallet as Address;
+    return row ? (row.wallet as Address) : 'expired';
+  }
+
+  app.decorate('sessionWallet', async (req: FastifyRequest) => {
+    const s = await lookupSession(req);
+    return s === 'none' || s === 'expired' ? null : s;
+  });
+
+  app.decorate('requireSession', async (req: FastifyRequest) => {
+    const s = await lookupSession(req);
+    if (s === 'none') throw new HttpError(401, 'Sign in with your wallet first.');
+    if (s === 'expired') throw new HttpError(401, 'Your session expired. Sign in again.');
+    req.wallet = s;
   });
 
   app.setErrorHandler((err, req, reply) => {
@@ -104,5 +129,7 @@ export async function buildApp(deps: Deps) {
   await app.register(ipfsRoutes);
   await app.register(launchRoutes);
   await app.register(tokenRoutes);
+  await app.register(calloutRoutes);
+  await app.register(liveRoutes);
   return app;
 }

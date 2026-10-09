@@ -5,13 +5,18 @@ import { loadEnv } from './env';
 import { memoryKv, redisKv } from './kv';
 import { rpcChainReader } from './services/chain';
 import { devPinner, pinataPinner } from './services/pinner';
+import { allowAllModerator, deepseekModerator } from './services/moderation';
+import { memoryPubSub, redisPubSub } from './services/pubsub';
 import { deepseekScorer, offlineScorer } from './services/scorer';
 import { envioClient, envioLaunchSource } from './services/envio';
 import { rpcLaunchSource, tokenIndex } from './services/tokenIndex';
 
 const env = loadEnv();
 const { db, close: closeDb } = await connectPostgres(env.DATABASE_URL);
-const kv = env.REDIS_URL ? redisKv(new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2 })) : memoryKv();
+const redis = env.REDIS_URL ? new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2 }) : null;
+const kv = redis ? redisKv(redis) : memoryKv();
+const pubsub = redis ? redisPubSub(redis) : memoryPubSub();
+const deepseek = env.DEEPSEEK_API_KEY ? { apiKey: env.DEEPSEEK_API_KEY, baseURL: env.DEEPSEEK_BASE_URL, model: env.DEEPSEEK_MODEL, log: (m: string) => console.warn(m) } : null;
 
 const envio = env.ENVIO_GRAPHQL_URL ? envioClient(env.ENVIO_GRAPHQL_URL) : undefined;
 
@@ -21,13 +26,13 @@ const app = await buildApp({
   envio,
   kv,
   chain: rpcChainReader(env.RPC_URL_SERVER),
-  scorer: env.DEEPSEEK_API_KEY
-    ? deepseekScorer({ apiKey: env.DEEPSEEK_API_KEY, baseURL: env.DEEPSEEK_BASE_URL, model: env.DEEPSEEK_MODEL, log: (m) => console.warn(m) })
-    : offlineScorer,
+  scorer: deepseek ? deepseekScorer(deepseek) : offlineScorer,
+  moderator: deepseek ? deepseekModerator(deepseek) : allowAllModerator,
+  pubsub,
   pinner: env.PINATA_JWT ? pinataPinner(env.PINATA_JWT) : devPinner(),
 });
 
-const standIns = [!env.REDIS_URL && 'in-memory KV', !env.DEEPSEEK_API_KEY && 'offline scorer', !env.PINATA_JWT && 'dev pinner (nothing published)'].filter(Boolean);
+const standIns = [!env.REDIS_URL && 'in-memory KV', !env.DEEPSEEK_API_KEY && 'offline scorer and allow-all callout moderation', !env.PINATA_JWT && 'dev pinner (nothing published)'].filter(Boolean);
 if (standIns.length) app.log.warn(`Running with stand-ins: ${standIns.join(', ')}`);
 
 const rpcSource = rpcLaunchSource(env.RPC_URL_SERVER);
@@ -48,7 +53,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {
     index?.stop();
     await app.close();
-    await Promise.all([closeDb(), kv.close()]);
+    await Promise.all([closeDb(), pubsub.close(), kv.close()]);
     process.exit(0);
   });
 }

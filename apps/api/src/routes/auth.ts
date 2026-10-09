@@ -65,7 +65,14 @@ export async function authRoutes(app: FastifyInstance) {
     return { wallet, expiresAt: expiresAt.toISOString() };
   });
 
-  app.get('/auth/me', { preHandler: app.requireSession }, async (req) => ({ wallet: req.wallet }));
+  app.get('/auth/me', { preHandler: app.requireSession }, async (req) => {
+    const [profile] = await db.select({ nickname: schema.profiles.nickname }).from(schema.profiles).where(eq(schema.profiles.wallet, req.wallet!)).limit(1);
+    return {
+      wallet: req.wallet,
+      nickname: profile?.nickname ?? null,
+      official: env.OFFICIAL_WALLETS.some((w) => w.toLowerCase() === req.wallet!.toLowerCase()),
+    };
+  });
 
   app.post('/auth/logout', async (req, reply) => {
     const signed = req.cookies[SESSION_COOKIE];

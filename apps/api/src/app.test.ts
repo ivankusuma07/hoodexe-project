@@ -30,7 +30,7 @@ describe('SIWE sessions', () => {
   it('signs in, reports the wallet, and logs out', async () => {
     const cookie = await signIn(ctx);
     const me = await ctx.app.inject({ method: 'GET', url: '/auth/me', headers: { cookie } });
-    expect(me.json()).toEqual({ wallet: alice.address });
+    expect(me.json()).toEqual({ wallet: alice.address, nickname: null, official: false });
 
     await ctx.app.inject({ method: 'POST', url: '/auth/logout', headers: { cookie } });
     expect((await ctx.app.inject({ method: 'GET', url: '/auth/me', headers: { cookie } })).statusCode).toBe(401);

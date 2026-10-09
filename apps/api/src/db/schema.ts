@@ -1,4 +1,4 @@
-import { bigint, boolean, index, integer, jsonb, numeric, pgTable, smallint, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, boolean, index, integer, jsonb, numeric, pgTable, primaryKey, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /** docs/BRIEF.md §9. Callouts, reactions and profiles arrive with Callouts.exe in week 3. */
 
@@ -84,3 +84,47 @@ export const indexState = pgTable('index_state', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
 });
+
+/** Wallet identities for callouts (docs/BRIEF.md §5.5, §10). Official comes from OFFICIAL_WALLETS. */
+export const profiles = pgTable('profiles', {
+  wallet: text('wallet').primaryKey(),
+  /** 3–15 chars a-z 0-9 _; unique; changeable once per 24 h. */
+  nickname: text('nickname').unique(),
+  nicknameChangedAt: timestamp('nickname_changed_at', { withTimezone: true }),
+  /** Set by Bix. Wallets whose hood.exe launch graduated count as verified without it. */
+  verified: boolean('verified').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const callouts = pgTable(
+  'callouts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** The poster; empty for system callouts, which the worker writes as "hood.exe". */
+    wallet: text('wallet').notNull(),
+    tokenAddress: text('token_address'),
+    ticker: text('ticker'),
+    text: text('text').notNull(),
+    kind: text('kind', { enum: ['user', 'system'] }).notNull(),
+    /** Stored but not shown: blocklist, model verdict, or moderation unavailable (§10). */
+    hidden: boolean('hidden').notNull().default(false),
+    hiddenReason: text('hidden_reason'),
+    /** System callouts: the event they describe, so the worker never posts one twice. */
+    sourceKey: text('source_key').unique(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('callouts_created_idx').on(t.createdAt, t.id), index('callouts_token_idx').on(t.tokenAddress, t.createdAt), index('callouts_wallet_idx').on(t.wallet)],
+);
+
+export const reactions = pgTable(
+  'reactions',
+  {
+    calloutId: uuid('callout_id')
+      .notNull()
+      .references(() => callouts.id, { onDelete: 'cascade' }),
+    wallet: text('wallet').notNull(),
+    kind: text('kind', { enum: ['rocket', 'eyes', 'skull'] }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.calloutId, t.wallet, t.kind] })],
+);

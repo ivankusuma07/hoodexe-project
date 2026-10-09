@@ -37,6 +37,10 @@ const envSchema = z
     /** Explore's token table sync; 'off' when another process runs it. */
     TOKEN_INDEX: z.enum(['on', 'off']).default('on'),
     TOKEN_INDEX_BACKFILL_BLOCKS: z.coerce.number().int().min(0).default(300_000),
+    /** Wallets shown as official in Callouts (blue left border). */
+    OFFICIAL_WALLETS: list(''),
+    /** Extra blocklist terms for callouts, comma-separated. */
+    BLOCKLIST_EXTRA: list(''),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;

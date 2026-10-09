@@ -8,7 +8,9 @@ import { loadEnv } from '../env';
 import { memoryKv } from '../kv';
 import type { ChainReader, LaunchOnChain } from '../services/chain';
 import type { EnvioClient } from '../services/envio';
+import type { Moderator } from '../services/moderation';
 import { devPinner } from '../services/pinner';
+import { memoryPubSub } from '../services/pubsub';
 import type { Scorer } from '../services/scorer';
 
 // Anvil's well-known dev keys; never funded on mainnet.
@@ -24,7 +26,7 @@ export const BREAKDOWN: RigorBreakdown = {
   reasoning: "Euler's identity, a classical result.",
 };
 
-export async function setup(opts: { scorer?: Scorer; launches?: Map<string, LaunchOnChain | 'pending' | null>; envio?: EnvioClient } = {}) {
+export async function setup(opts: { scorer?: Scorer; launches?: Map<string, LaunchOnChain | 'pending' | null>; envio?: EnvioClient; moderator?: Moderator; official?: string } = {}) {
   const { db, close } = await connectMemory();
   let clock = new Date('2026-10-09T12:00:00Z').getTime();
   const scorerCalls: string[] = [];
@@ -35,19 +37,28 @@ export async function setup(opts: { scorer?: Scorer; launches?: Map<string, Laun
     },
   };
   const launches = opts.launches ?? new Map();
+  /** ETH balances by lowercase address; anyone not listed holds 1 ETH. */
+  const balances = new Map<string, bigint>();
   const chain: ChainReader = {
     verifySignature: (address, message, signature) => verifyMessage({ address, message, signature }),
     launchFromTx: async (hash) => launches.get(hash.toLowerCase()) ?? null,
+    balance: async (address) => balances.get(address.toLowerCase()) ?? 10n ** 18n,
   };
   const pinner = devPinner();
+  const pubsub = memoryPubSub();
+  /** Allows everything, recording what it was asked. */
+  const moderated: string[] = [];
+  const moderator: Moderator = { check: async (text) => (moderated.push(text), { allow: true, reason: 'ok' }) };
   const app = await buildApp({
-    env: loadEnv({ NODE_ENV: 'test', DATABASE_URL: 'memory', CORS_ORIGINS: ORIGIN }),
+    env: loadEnv({ NODE_ENV: 'test', DATABASE_URL: 'memory', CORS_ORIGINS: ORIGIN, OFFICIAL_WALLETS: opts.official ?? '' }),
     db,
     kv: memoryKv(() => clock),
     scorer,
     pinner,
     chain,
     envio: opts.envio,
+    moderator: opts.moderator ?? moderator,
+    pubsub,
     now: () => new Date(clock),
   });
   return {
@@ -56,6 +67,9 @@ export async function setup(opts: { scorer?: Scorer; launches?: Map<string, Laun
     pinner,
     scorerCalls,
     launches,
+    balances,
+    pubsub,
+    moderated,
     advance: (ms: number) => void (clock += ms),
     now: () => new Date(clock),
     close: async () => {
