@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useDisconnect } from 'wagmi';
 import { APPS, isAppId, type AppId } from '@/components/apps/meta';
 import { APP_COMPONENTS } from '@/components/apps';
+import { logout } from '@/lib/api';
 import { openApp } from '@/lib/openApp';
 import { useWindows } from '@/store/windows';
 import { DesktopIcons } from './DesktopIcons';
@@ -122,6 +123,8 @@ export function Desktop() {
         <LogOffDialog
           onCancel={cancelOverlay}
           onLogOff={() => {
+            // Log Off ends the SIWE session too (docs/BRIEF.md §4.4); the API may be unreachable.
+            void logout().catch(() => {});
             disconnect();
             startUp(false);
           }}

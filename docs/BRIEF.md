@@ -434,6 +434,8 @@ Day 7: 50+ launches · Day 14: $10k+ volume · Day 30: 200+ wallets, 500+ callou
 - Bix: domain + 10 accounts; reference preview / screenshots; RPC provider; confirm curve-selector + platform-fee removal; `OFFICIAL_WALLETS`; house tokens; lawyer review + geo-blocking; DeepSeek balance (USD 20); pricing + milestones; soft-launch plan.
 - ~~Dev: metadata caps~~ — done (§5.2). Pons: referral / interface-fee program.
 - Bix: "fee sharing → holders pro-rata" (§5.2) has no Pons equivalent. `buybackEnabled` is the only fee switch, and it is creator-funded buyback & lock vesting over 5 years, split with Pons. The wizard shows it as an opt-in checkbox (default off). Confirm or drop.
+- Dev: SIWE moved forward from week 3, since `/ipfs` needs a session; the wizard signs in before pinning. The DeepSeek "thinking off" switch is sent as `thinking: {type: "disabled"}` (third-party V4 docs). Confirm it against api-docs.deepseek.com once a key is in place.
+- Dev: `/ipfs` and `/launches` use the server's cached rigor score, never the client's, so a forged score can't reach IPFS or the launch record.
 
 ---
 

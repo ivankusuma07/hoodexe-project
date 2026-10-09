@@ -41,13 +41,32 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
+const sessionSchema = z.object({ wallet: z.string() });
+
+/** GET /auth/me: the signed-in wallet, or null without a session. */
+export async function currentSession(): Promise<string | null> {
+  try {
+    return (await request('/auth/me', { method: 'GET' }, sessionSchema)).wallet;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) return null;
+    throw e;
+  }
+}
+
+export const siweNonce = () => request('/auth/siwe', { method: 'GET' }, z.object({ nonce: z.string() })).then((r) => r.nonce);
+
+export const verifySiwe = (message: string, signature: string) => request('/auth/siwe', json({ message, signature }), sessionSchema);
+
+export const logout = () => request('/auth/logout', { method: 'POST' }, z.unknown());
+
 /** POST /score-theorem. The server caches by normalised statement; a model failure comes back as score null. */
 export function scoreTheorem(name: string, statement: string): Promise<RigorScore> {
   // The server allows 8 s for the model; leave room for the round trip.
   return request('/score-theorem', json({ name, statement }), rigorScoreSchema, 12_000);
 }
 
-const pinnedSchema = z.object({ logoCid: z.string().min(1), metadataCid: z.string().min(1) });
+/** `rigorScore` is the server's score for the statement, which is what the pinned metadata carries. */
+const pinnedSchema = z.object({ logoCid: z.string().min(1), metadataCid: z.string().min(1), rigorScore: z.number().int().nullable() });
 export type Pinned = z.infer<typeof pinnedSchema>;
 
 /** POST /ipfs: the cropped logo and the theorem metadata JSON, pinned server-side with Pinata. */

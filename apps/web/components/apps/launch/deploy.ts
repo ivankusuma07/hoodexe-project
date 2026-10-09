@@ -13,11 +13,12 @@ import {
   type TheoremMetadata,
 } from '@hood/shared';
 import { pinLaunch, recordLaunch } from '@/lib/api';
+import { ensureSession } from '@/lib/siwe';
 import { LAUNCH_CONFIG_ID, type LaunchTerms } from '@/lib/pons/launch';
 import { chain, wagmiConfig } from '@/lib/wagmi';
 import { creatorTaxBps, currentRigor, devBuyAmount, type Draft } from './draft';
 
-export type DeployStep = 'pin' | 'approve' | 'sign' | 'confirm' | 'record';
+export type DeployStep = 'signin' | 'pin' | 'approve' | 'sign' | 'confirm' | 'record';
 
 export type DeployResult = {
   token: Address;
@@ -75,15 +76,19 @@ export async function deployLaunch(draft: Draft, terms: LaunchTerms, onStep: (st
   const tax = creatorTaxBps(draft) ?? 0;
   const quote = devBuyQuote(draft, terms);
 
+  onStep('signin');
+  await ensureSession(account);
+
   onStep('pin');
   const metadata = theoremMetadata(draft);
-  const { logoCid, metadataCid } = await pinLaunch(draft.logo.blob, metadata);
+  const { logoCid, metadataCid, rigorScore } = await pinLaunch(draft.logo.blob, metadata);
 
   const params = buildTokenParams({
     name: metadata.name,
     symbol: metadata.ticker,
     logo: `ipfs://${logoCid}`,
-    description: buildDescription(metadata.statement, metadata.rigor?.score ?? null, metadataCid),
+    // The server pins its own score for the statement; the description must agree with it.
+    description: buildDescription(metadata.statement, rigorScore, metadataCid),
     socials: draft.socials,
     creatorFeeRecipient: (draft.creator.trim() || account) as Address,
     creatorTaxBps: tax,

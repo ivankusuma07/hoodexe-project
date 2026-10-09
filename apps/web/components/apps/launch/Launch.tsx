@@ -42,6 +42,7 @@ const HEADERS: Record<Page, [string, string]> = {
 };
 
 const STEP_LABELS: [DeployStep, string][] = [
+  ['signin', 'Signing in with your wallet'],
   ['pin', 'Uploading logo and theorem to IPFS'],
   ['approve', 'Approving the dev buy in your wallet'],
   ['sign', 'Waiting for your signature'],
@@ -123,7 +124,7 @@ export function Launch({ win }: { win: WindowState }) {
 
   const runDeploy = async () => {
     if (!terms) return;
-    setDeploy({ state: 'running', step: 'pin', done: [] });
+    setDeploy({ state: 'running', step: 'signin', done: [] });
     try {
       const result = await deployLaunch(draft, terms, (step, hash) =>
         setDeploy((cur) => {
