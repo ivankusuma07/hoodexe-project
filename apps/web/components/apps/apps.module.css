@@ -85,27 +85,8 @@
 .nameCell { display: flex; align-items: center; gap: 4px; }
 .listWrap { flex: 1 1 auto; min-height: 0; overflow: auto; background: #fff; border-top: 1px solid #d6d2c2; }
 
-/* Setup-style placeholder for programs that arrive in later weeks. */
-.setup { flex: 1 1 auto; min-height: 0; display: flex; }
-.setupSide {
-  flex: 0 0 150px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #fff;
-  text-align: center;
-  padding: 12px;
-  background: linear-gradient(to bottom, #3169c6 0%, #6b97e0 60%, #9fbdee 100%);
-}
-.setupMain { flex: 1 1 auto; min-width: 0; padding: 16px; background: #fff; overflow: auto; }
-.setupMain h3 { margin: 0 0 8px; font-size: 13px; }
-.setupMain ul { margin: 6px 0 12px; padding-left: 18px; }
-
 .balance { font-family: var(--font-mono); font-size: 12px; }
 
 @media (max-width: 640px) {
-  .setupSide { display: none; }
   .display { font-size: 20px; }
 }

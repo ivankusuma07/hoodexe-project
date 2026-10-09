@@ -41,7 +41,7 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
-const sessionSchema = z.object({ wallet: z.string() });
+const sessionSchema = z.object({ wallet: z.string(), nickname: z.string().nullable().optional(), official: z.boolean().optional() });
 
 /** GET /auth/me: the signed-in wallet, or null without a session. */
 export async function currentSession(): Promise<string | null> {
@@ -157,4 +157,85 @@ export type Trade = z.infer<typeof tradesSchema>['trades'][number];
 /** GET /tokens/:address/trades: the newest 50, newest first. */
 export function fetchTrades(address: string): Promise<Trade[]> {
   return request(`/tokens/${encodeURIComponent(address)}/trades?limit=50`, { method: 'GET' }, tradesSchema).then((r) => r.trades);
+}
+
+export const REACTION_KINDS = ['rocket', 'eyes', 'skull'] as const;
+export type ReactionKind = (typeof REACTION_KINDS)[number];
+const reactionsSchema = z.object({ rocket: z.number(), eyes: z.number(), skull: z.number() });
+export type Reactions = z.infer<typeof reactionsSchema>;
+
+/** docs/BRIEF.md §5.5 `Callout`; `mine` lists the viewer's own reactions when signed in. */
+export const calloutSchema = z.object({
+  id: z.string(),
+  wallet: z.string(),
+  nickname: z.string().optional(),
+  tokenAddress: z.string().nullable(),
+  ticker: z.string().nullable(),
+  text: z.string(),
+  kind: z.enum(['user', 'system']),
+  createdAt: z.string(),
+  reactions: reactionsSchema,
+  official: z.boolean().optional(),
+  verified: z.boolean().optional(),
+  mine: z.array(z.enum(REACTION_KINDS)).optional(),
+});
+export type Callout = z.infer<typeof calloutSchema>;
+
+const calloutPageSchema = z.object({
+  items: z.array(calloutSchema),
+  nextCursor: z.string().nullable(),
+  newestCursor: z.string().nullable(),
+  live: z.object({ callouts: z.number(), users: z.number() }),
+});
+export type CalloutPage = z.infer<typeof calloutPageSchema>;
+
+/** GET /callouts: newest first; `before` pages older, `after` polls newer. */
+export function fetchCallouts(q: { before?: string; after?: string; token?: string; limit?: number } = {}): Promise<CalloutPage> {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(q)) if (v != null) params.set(k, String(v));
+  return request(`/callouts?${params}`, { method: 'GET' }, calloutPageSchema);
+}
+
+/** POST /callouts. `hidden` means moderation held it: the poster sees it, nobody else does. */
+export function postCallout(text: string, tokenAddress?: string): Promise<{ callout: Callout; hidden: boolean }> {
+  return request('/callouts', json({ text, tokenAddress }), z.object({ callout: calloutSchema, hidden: z.boolean() }));
+}
+
+/** POST /callouts/:id/react: toggles one kind for this wallet. */
+export function reactToCallout(id: string, kind: ReactionKind): Promise<{ id: string; reactions: Reactions; reacted: boolean }> {
+  return request(`/callouts/${encodeURIComponent(id)}/react`, json({ kind }), z.object({ id: z.string(), reactions: reactionsSchema, reacted: z.boolean() }));
+}
+
+/** PUT /profile: 3–15 chars a-z 0-9 _, once a day. */
+export function setNickname(nickname: string): Promise<{ wallet: string; nickname: string }> {
+  return request('/profile', { ...json({ nickname }), method: 'PUT' }, z.object({ wallet: z.string(), nickname: z.string() }));
+}
+
+/** Messages on /ws (docs/BRIEF.md §9). */
+export const liveMessageSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('hello'), pingMs: z.number() }),
+  z.object({ type: z.literal('ping'), at: z.number() }),
+  z.object({ type: z.literal('callout'), callout: calloutSchema }),
+  z.object({ type: z.literal('reactions'), id: z.string(), reactions: reactionsSchema }),
+]);
+export type LiveMessage = z.infer<typeof liveMessageSchema>;
+
+/** The WebSocket URL: NEXT_PUBLIC_WS_URL, else the API URL with ws(s) and /ws. */
+export function liveUrl(): string | null {
+  const explicit = process.env.NEXT_PUBLIC_WS_URL;
+  if (explicit) return explicit;
+  if (!API_URL) return null;
+  return `${API_URL.replace(/^http/, 'ws')}/ws`;
+}
+
+export type Session = z.infer<typeof sessionSchema>;
+
+/** GET /auth/me in full (wallet, nickname, official), or null without a session. */
+export async function fetchSession(): Promise<Session | null> {
+  try {
+    return await request('/auth/me', { method: 'GET' }, sessionSchema);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) return null;
+    throw e;
+  }
 }

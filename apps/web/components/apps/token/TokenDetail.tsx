@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { RIGOR_DISCLAIMER, addressUrl, shortAddress } from '@hood/shared';
 import { ProgressBar, Tabs } from '@/components/xp/Controls';
-import { InfoIcon } from '@/components/xp/Icons';
+
 import { Latex } from '@/components/xp/Latex';
 import { RigorBadge } from '@/components/xp/RigorBadge';
 import { ApiError, CHART_INTERVALS, fetchCandles, fetchToken, type ChartInterval, type TokenDetail as Token } from '@/lib/api';
@@ -13,6 +13,7 @@ import { useWindows, type WindowState } from '@/store/windows';
 import { PHASE_LABEL, formatPercent, formatQuote, timeAgo } from '../explore/format';
 import { TokenLogo } from '../explore/TokenLogo';
 import { PriceChart } from './PriceChart';
+import { CalloutFeed } from '../callouts/CalloutFeed';
 import { TradePanel } from './TradePanel';
 import { TradesTab } from './TradesTab';
 import styles from './TokenDetail.module.css';
@@ -50,16 +51,7 @@ export function TokenDetail({ win }: { win: WindowState }) {
           <Tabs
             tabs={[
               { id: 'trades', label: 'Trades', content: <TradesTab address={t.token} symbol={t.symbol} pairSymbol={t.pair.symbol} paused={paused} /> },
-              {
-                id: 'callouts',
-                label: 'Callouts',
-                content: (
-                  <div className={styles.note}>
-                    <InfoIcon size={16} />
-                    <p>Callouts for ${t.symbol} arrive with Callouts.exe.</p>
-                  </div>
-                ),
-              },
+              { id: 'callouts', label: 'Callouts', content: <CalloutFeed token={t.token} ticker={t.symbol} /> },
               { id: 'theorem', label: 'Theorem', content: <TheoremTab token={t} /> },
             ]}
           />
