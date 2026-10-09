@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "check:pons": "tsx scripts/check-pons.ts"
+    "check:pons": "tsx scripts/check-pons.ts",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "viem": "^2"
@@ -17,6 +18,10 @@
     "@types/node": "^24.19.1",
     "tsx": "^4",
     "typescript": "^5",
-    "viem": "2.57.4"
+    "viem": "2.57.4",
+    "vitest": "5.0.3"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
   }
 }

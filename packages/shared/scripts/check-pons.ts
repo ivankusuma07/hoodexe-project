@@ -4,11 +4,24 @@
  *
  *   pnpm --filter @hood/shared check:pons [wallet]
  */
-import { createPublicClient, formatEther, http, parseAbiItem, type Address } from 'viem';
-import { PONS_V2, PUBLIC_RPC_MAINNET, ponsCurveAbi, ponsFactoryAbi, ponsTokenAbi, robinhoodChain } from '../src';
+import { createPublicClient, formatEther, http, parseAbiItem, parseEther, type Address } from 'viem';
+import {
+  NATIVE_PAIR,
+  PONS_V2,
+  PUBLIC_RPC_MAINNET,
+  ponsCurveAbi,
+  ponsFactoryAbi,
+  ponsTokenAbi,
+  quoteBuy,
+  robinhoodChain,
+} from '../src';
 
 const rpc = process.env.RPC_URL || PUBLIC_RPC_MAINNET;
-const client = createPublicClient({ chain: robinhoodChain(rpc), transport: http(rpc) });
+// The public RPC is rate-limited: batch calls and back off on 429s.
+const client = createPublicClient({
+  chain: robinhoodChain(rpc),
+  transport: http(rpc, { batch: { batchSize: 20, wait: 20 }, retryCount: 6, retryDelay: 1_500 }),
+});
 const factory = { address: PONS_V2.launchFactory, abi: ponsFactoryAbi } as const;
 const probe = (process.argv[2] as Address | undefined) ?? '0x000000000000000000000000000000000000dEaD';
 
@@ -82,6 +95,28 @@ async function main() {
 
   const info = await client.readContract({ address: token, abi: ponsTokenAbi, functionName: 'getTokenInfo' });
   console.log('getTokenInfo:', { deployer: info[0], logo: info[1].slice(0, 80), description: info[2].slice(0, 120) });
+
+  // Quote port vs. the contract: simulate buy() with eth_call (balance overridden, nothing is sent).
+  if (record.phase === 0 && pairToken === NATIVE_PAIR) {
+    const creatorTaxBps = await client.readContract({ ...c, functionName: 'creatorTaxBps' });
+    const state = { quoteReserve: reserves[0], tokenReserve: reserves[1], sellable, feeBps, creatorTaxBps };
+    const buyer: Address = '0x00000000000000000000000000000000000b0b0b';
+    for (const eth of ['0.001', '0.05', '1', '50']) {
+      const quoteIn = parseEther(eth);
+      const snipeBps = await client.readContract({ ...c, functionName: 'currentSnipeTaxBps', args: [buyer] });
+      const quote = quoteBuy(state, quoteIn, snipeBps);
+      const { result } = await client.simulateContract({
+        ...c,
+        functionName: 'buy',
+        args: [quoteIn, 0n, buyer],
+        value: quoteIn,
+        account: buyer,
+        stateOverride: [{ address: buyer, balance: parseEther('1000') }],
+      });
+      const match = quote?.tokensOut === result ? 'MATCH' : 'MISMATCH';
+      console.log(`buy ${eth} ETH: contract ${result} · quote ${quote?.tokensOut} (snipe ${snipeBps} bps, clamped ${quote?.completesCurve}) → ${match}`);
+    }
+  }
 }
 
 main().catch((e) => {
