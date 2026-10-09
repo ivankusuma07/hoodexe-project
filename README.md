@@ -9,12 +9,20 @@ Token launchpad for Robinhood Chain in a Luna-style desktop. Launches and trades
 
 ```
 apps/web/          Next.js 16.4 frontend (Vercel)
-apps/api/          Fastify 5 API: SIWE sessions, rigor scoring, IPFS pinning, launch records, Explore (Railway)
+apps/api/          Fastify 5 API: SIWE sessions, rigor scoring, IPFS pinning, launch records, Explore, charts and trades (Railway)
 apps/indexer/      Envio HyperIndex: Pons V2 launches, curve trades, candles, graduations (Envio hosted)
 packages/shared/   Chain config, Pons V2 ABIs and quote maths, zod schemas, shared helpers
 ```
 
 `apps/worker` arrives with Callouts.
+
+## What works
+
+- **Desktop**: boot screen, draggable windows, taskbar, Start menu, Shut Down; XP-skinned RainbowKit on chain 4663.
+- **Launch.exe**: three-page wizard (identity, theorem with live KaTeX preview and rigor score, economics), then a review page with curve preview and dev-buy quote. Signs in with SIWE, pins to IPFS, launches via `launchToken` or `launchAndBuy`.
+- **Explore.exe**: "hood.exe launches" / "All Pons" tabs, sort by Latest, Volume, Rigor or MCap.
+- **Token Detail**: candle chart (1m–1d), last trades, graduation progress, and curve buy/sell with approvals, slippage and snipe-tax handling. Graduated coins link out to Pons.
+- Still placeholders: Callouts, tray balloons, legal windows.
 
 ## Develop
 
@@ -45,6 +53,7 @@ Open the web app on `localhost`, not `127.0.0.1`, so the session cookie reaches 
 - API tests run on in-process Postgres (PGlite) and need no Docker.
 - Schema changes: edit `apps/api/src/db/schema.ts`, then `pnpm --filter @hood/api db:generate`.
 - Explore's `/tokens` table: launches come from the indexer (`ENVIO_GRAPHQL_URL`); names, logos and live reserves from `RPC_URL_SERVER` (eth_call only, so a free-tier RPC is fine). Without `ENVIO_GRAPHQL_URL` the API falls back to scanning RPC logs, which free RPC tiers cap at a few blocks. `TOKEN_INDEX=off` disables it.
+- Token Detail's chart (`/tokens/:address/candles`), trades (`/tokens/:address/trades`) and Explore's Volume sort read the indexer directly; without `ENVIO_GRAPHQL_URL` the first two answer 503 and Volume is hidden.
 
 ### Indexer (Envio)
 
