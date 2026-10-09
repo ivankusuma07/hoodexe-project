@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseEther, type Address } from 'viem';
 import { NATIVE_PAIR, buildDescription } from '@hood/shared';
 import { schema } from './db';
-import { tokenIndex, type CurveState, type LaunchSource, type RawLaunch, type TokenMetadata } from './services/tokenIndex';
+import { envioLaunchSource, tokenIndex, type CurveState, type LaunchSource, type RawLaunch, type TokenMetadata } from './services/tokenIndex';
 import { setup } from './test/helpers';
 
 type Ctx = Awaited<ReturnType<typeof setup>>;
@@ -109,6 +109,61 @@ describe('token index', () => {
     expect(await index.refresh()).toBe(3); // hood token + the 2 newest
     const rows = await ctx.db.select().from(schema.tokens);
     expect(rows.filter((r) => r.stateUpdatedAt).map((r) => r.symbol).sort()).toEqual(['C1', 'C3', 'C4']);
+  });
+});
+
+describe('envioLaunchSource', () => {
+  const row = (n: number, block: number) => ({
+    id: addr(n),
+    curve: addr(n + 10_000),
+    deployer: addr(1),
+    pairToken: NATIVE_PAIR,
+    graduationThreshold: '4200000000000000000',
+    launchBlock: block,
+    launchedAt: 1_791_500_000 + block,
+  });
+
+  /** A Hasura stand-in: chain_metadata plus a Token table filtered and paged like the real query. */
+  function stubEnvio(rows: ReturnType<typeof row>[], head = 1_000) {
+    const requests: { query: string; variables: Record<string, number> }[] = [];
+    vi.stubGlobal('fetch', async (_url: string, init: { body: string }) => {
+      const { query, variables } = JSON.parse(init.body);
+      requests.push({ query, variables });
+      const data = query.includes('chain_metadata')
+        ? { chain_metadata: [{ chain_id: 4663, latest_processed_block: head }] }
+        : {
+            Token: rows
+              .filter((r) => r.launchBlock >= variables.from && r.launchBlock <= variables.to)
+              .slice(variables.offset, variables.offset + variables.limit),
+          };
+      return new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } });
+    });
+    return requests;
+  }
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('reads the indexed head and pages through launches, metadata and state from the RPC', async () => {
+    const f = fakeSource();
+    for (const n of [2, 3, 4]) f.launch(n, 600 + n); // metadata for the tokens Envio will report
+    const requests = stubEnvio([row(2, 602), row(3, 603), row(4, 604), row(5, 1_200)], 1_000);
+    const source = envioLaunchSource('http://envio.test/v1/graphql', f.source, 2);
+
+    expect(await source.latestBlock()).toBe(1_000);
+    const launches = await source.launches(600, 1_000);
+    expect(launches.map((l) => l.token)).toEqual([addr(2), addr(3), addr(4)]);
+    expect(launches[0]).toMatchObject({ curve: addr(10_002), graduationThreshold: 4_200_000_000_000_000_000n, blockNumber: 602, timestamp: new Date((1_791_500_000 + 602) * 1000) });
+    // Page size 2: offsets 0 and 2, then a short page ends it.
+    expect(requests.filter((r) => r.query.includes('Launches')).map((r) => r.variables.offset)).toEqual([0, 2]);
+
+    await tokenIndex(ctx.db, source, opts).sync();
+    expect((await ctx.db.select().from(schema.tokens)).map((r) => r.symbol).sort()).toEqual(['C2', 'C3', 'C4']);
+  });
+
+  it('surfaces GraphQL errors and a chain Envio has not reached', async () => {
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ errors: [{ message: 'field "Token" not found' }] })));
+    await expect(envioLaunchSource('http://envio.test', fakeSource().source).launches(0, 1)).rejects.toThrow(/field "Token" not found/);
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ data: { chain_metadata: [{ chain_id: 4663, latest_processed_block: null }] } })));
+    await expect(envioLaunchSource('http://envio.test', fakeSource().source).latestBlock()).rejects.toThrow(/not indexed/);
   });
 });
 

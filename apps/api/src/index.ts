@@ -6,7 +6,7 @@ import { memoryKv, redisKv } from './kv';
 import { rpcChainReader } from './services/chain';
 import { devPinner, pinataPinner } from './services/pinner';
 import { deepseekScorer, offlineScorer } from './services/scorer';
-import { rpcLaunchSource, tokenIndex } from './services/tokenIndex';
+import { envioLaunchSource, rpcLaunchSource, tokenIndex } from './services/tokenIndex';
 
 const env = loadEnv();
 const { db, close: closeDb } = await connectPostgres(env.DATABASE_URL);
@@ -26,15 +26,18 @@ const app = await buildApp({
 const standIns = [!env.REDIS_URL && 'in-memory KV', !env.DEEPSEEK_API_KEY && 'offline scorer', !env.PINATA_JWT && 'dev pinner (nothing published)'].filter(Boolean);
 if (standIns.length) app.log.warn(`Running with stand-ins: ${standIns.join(', ')}`);
 
+const rpcSource = rpcLaunchSource(env.RPC_URL_SERVER);
 const index =
-  env.TOKEN_INDEX === 'rpc'
-    ? tokenIndex(db, rpcLaunchSource(env.RPC_URL_SERVER), {
+  env.TOKEN_INDEX === 'on'
+    ? tokenIndex(db, env.ENVIO_GRAPHQL_URL ? envioLaunchSource(env.ENVIO_GRAPHQL_URL, rpcSource) : rpcSource, {
         backfillBlocks: env.TOKEN_INDEX_BACKFILL_BLOCKS,
-        chunkBlocks: 500_000,
+        // Envio pages internally; raw log scans are capped by the RPC's response limit.
+        chunkBlocks: env.ENVIO_GRAPHQL_URL ? 5_000_000 : 500_000,
         refreshRecent: 300,
         log: (m) => app.log.warn(m),
       })
     : null;
+if (index && !env.ENVIO_GRAPHQL_URL) app.log.warn('Token index is scanning RPC logs; set ENVIO_GRAPHQL_URL to use the indexer');
 index?.start();
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

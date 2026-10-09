@@ -9,11 +9,12 @@ Token launchpad for Robinhood Chain in a Luna-style desktop. Launches and trades
 
 ```
 apps/web/          Next.js 16.4 frontend (Vercel)
-apps/api/          Fastify 5 API: SIWE sessions, rigor scoring, IPFS pinning, launch records (Railway)
+apps/api/          Fastify 5 API: SIWE sessions, rigor scoring, IPFS pinning, launch records, Explore (Railway)
+apps/indexer/      Envio HyperIndex: Pons V2 launches, curve trades, candles, graduations (Envio hosted)
 packages/shared/   Chain config, Pons V2 ABIs and quote maths, zod schemas, shared helpers
 ```
 
-`apps/worker` and `apps/indexer` arrive next.
+`apps/worker` arrives with Callouts.
 
 ## Develop
 
@@ -43,7 +44,19 @@ Open the web app on `localhost`, not `127.0.0.1`, so the session cookie reaches 
 - Production refuses to start on either stand-in, without Redis, or with the dev session secret.
 - API tests run on in-process Postgres (PGlite) and need no Docker.
 - Schema changes: edit `apps/api/src/db/schema.ts`, then `pnpm --filter @hood/api db:generate`.
-- Explore's `/tokens` is fed by an interim index inside the API (`TOKEN_INDEX=rpc`, the default): it follows the factory's `TokenLaunched` logs from `TOKEN_INDEX_BACKFILL_BLOCKS` back (300k ≈ 8 h) and refreshes curve state for hood.exe tokens and the 300 newest launches. Envio replaces it; set `TOKEN_INDEX=off` then. It needs a dedicated `RPC_URL_SERVER`: the public RPC starts answering a busy client with Cloudflare challenges.
+- Explore's `/tokens` table: launches come from the indexer (`ENVIO_GRAPHQL_URL`); names, logos and live reserves from `RPC_URL_SERVER` (eth_call only, so a free-tier RPC is fine). Without `ENVIO_GRAPHQL_URL` the API falls back to scanning RPC logs, which free RPC tiers cap at a few blocks. `TOKEN_INDEX=off` disables it.
+
+### Indexer (Envio)
+
+envio ships no Windows build, so on Windows the indexer runs in Docker (the `indexer` compose profile); on Linux/macOS it runs natively. `apps/indexer/.env` needs `ENVIO_API_TOKEN` (a HyperSync token from envio.dev/app/api-tokens; the free package allows 5 requests/min).
+
+```bash
+docker compose --profile indexer up -d   # indexer (config.dev.yaml: starts near the chain head) + Hasura GraphQL on :8080
+pnpm --filter @hood/indexer test         # handler tests (in the container on Windows)
+pnpm --filter @hood/indexer codegen      # after editing config*.yaml or schema.graphql
+```
+
+Production deploys `config.yaml` (from the V2 factory's deployment, block 26,841,846) to Envio's hosted service: install the Envio Deployments GitHub app on this repo, root directory `apps/indexer`, then set the API's `ENVIO_GRAPHQL_URL` to the endpoint it gives you.
 
 ### Local chain (fork of 4663)
 
