@@ -139,6 +139,21 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000) {
       return data.Candle.reverse();
     },
 
+    /** Buys of at least `minQuote` on these tokens after `afterBlock`, oldest first (system callouts). */
+    async bigBuys(tokens: string[], minQuote: bigint, afterBlock: number, limit = 200): Promise<(EnvioTrade & { token: string; blockNumber: number })[]> {
+      if (!tokens.length) return [];
+      const data = await query(
+        `query BigBuys($tokens: [String!]!, $min: numeric!, $after: Int!, $limit: Int!) {
+          Trade(where: { token: { _in: $tokens }, isBuy: { _eq: true }, quoteAmount: { _gte: $min }, blockNumber: { _gt: $after } }, order_by: [{ blockNumber: asc }, { id: asc }], limit: $limit) {
+            id token trader isBuy quoteAmount tokenAmount price timestamp txHash blockNumber
+          }
+        }`,
+        { tokens, min: minQuote.toString(), after: afterBlock, limit },
+        z.object({ Trade: z.array(tradeRow.extend({ token: z.string(), blockNumber: z.number().int() })) }),
+      );
+      return data.Trade;
+    },
+
     /** Newest `limit` trades, newest first. */
     async trades(token: string, limit: number): Promise<EnvioTrade[]> {
       const data = await query(

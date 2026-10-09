@@ -233,6 +233,7 @@ describe('indexer-backed volume, candles and trades', () => {
       activity: async () => new Map(),
       candles: async () => [],
       trades: async () => [],
+      bigBuys: async () => [],
       ...over,
     };
   }

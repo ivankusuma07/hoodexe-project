@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "worker": "tsx src/worker.ts",
+    "dev:worker": "tsx watch --env-file-if-exists=.env src/worker.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8",
