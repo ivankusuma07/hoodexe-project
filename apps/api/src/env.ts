@@ -32,6 +32,9 @@ const envSchema = z
     SESSION_SECRET: z.string().default('dev-only-session-secret-change-me-0000'),
     COOKIE_DOMAIN: optional,
     CORS_ORIGINS: list('http://localhost:3000'),
+    /** Interim Explore index over RPC until Envio is set up; 'off' when another process runs it. */
+    TOKEN_INDEX: z.enum(['rpc', 'off']).default('rpc'),
+    TOKEN_INDEX_BACKFILL_BLOCKS: z.coerce.number().int().min(0).default(300_000),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;

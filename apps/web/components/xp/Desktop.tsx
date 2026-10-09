@@ -5,7 +5,8 @@ import { useDisconnect } from 'wagmi';
 import { APPS, isAppId, type AppId } from '@/components/apps/meta';
 import { APP_COMPONENTS } from '@/components/apps';
 import { logout } from '@/lib/api';
-import { openApp } from '@/lib/openApp';
+import { isAddress } from 'viem';
+import { openApp, openToken } from '@/lib/openApp';
 import { useWindows } from '@/store/windows';
 import { DesktopIcons } from './DesktopIcons';
 import { MessageBox } from './Dialog';
@@ -31,14 +32,23 @@ export function Desktop() {
 
   // First load: open the app named in ?app=, else Welcome.
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get('app');
-    if (useWindows.getState().windows.length === 0) openApp(isAppId(requested) ? requested : 'welcome');
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get('app');
+    const token = params.get('t');
+    if (useWindows.getState().windows.length > 0) return;
+    if (requested === 'token' && token && isAddress(token, { strict: false })) openToken(token);
+    else openApp(isAppId(requested) && requested !== 'token' ? requested : 'welcome');
   }, []);
 
   // Keep the URL pointing at the focused window so links shared on X reopen it.
   useEffect(() => {
     const active = windows.find((w) => w.id === activeId);
-    const next = active && active.appId !== 'welcome' ? `/?app=${active.appId}` : '/';
+    const next =
+      !active || active.appId === 'welcome'
+        ? '/'
+        : active.appId === 'token' && active.props?.address
+          ? `/?app=token&t=${active.props.address}`
+          : `/?app=${active.appId}`;
     if (window.location.pathname + window.location.search !== next) window.history.replaceState(null, '', next);
   }, [windows, activeId]);
 

@@ -81,3 +81,42 @@ export function pinLaunch(logo: Blob, metadata: TheoremMetadata): Promise<Pinned
 export function recordLaunch(txHash: string): Promise<unknown> {
   return request('/launches', json({ txHash }), z.unknown());
 }
+
+const tokenItemSchema = z.object({
+  token: z.string(),
+  curve: z.string(),
+  name: z.string(),
+  symbol: z.string(),
+  logo: z.string(),
+  pair: z.object({ address: z.string(), symbol: z.string(), decimals: z.number() }),
+  hood: z.boolean(),
+  statement: z.string().nullable(),
+  blurb: z.string().nullable(),
+  rigorScore: z.number().nullable(),
+  phase: z.number(),
+  price: z.number().nullable(),
+  marketCap: z.number().nullable(),
+  progress: z.number().nullable(),
+  launchedAt: z.string(),
+  stateUpdatedAt: z.string().nullable(),
+});
+export type TokenItem = z.infer<typeof tokenItemSchema>;
+
+const tokenPageSchema = z.object({ items: z.array(tokenItemSchema), total: z.number(), hoodCount: z.number(), offset: z.number() });
+export type TokenPage = z.infer<typeof tokenPageSchema>;
+
+export type TokenQuery = { tab: 'all' | 'hood'; sort: 'latest' | 'mcap' | 'rigor'; limit: number; offset: number };
+
+/** GET /tokens: Explore's grid. */
+export function fetchTokens(q: TokenQuery): Promise<TokenPage> {
+  const params = new URLSearchParams({ tab: q.tab, sort: q.sort, limit: String(q.limit), offset: String(q.offset) });
+  return request(`/tokens?${params}`, { method: 'GET' }, tokenPageSchema);
+}
+
+const tokenDetailSchema = tokenItemSchema.extend({ deployer: z.string(), description: z.string(), metadataCid: z.string().nullable() });
+export type TokenDetail = z.infer<typeof tokenDetailSchema>;
+
+/** GET /tokens/:address */
+export function fetchToken(address: string): Promise<TokenDetail> {
+  return request(`/tokens/${encodeURIComponent(address)}`, { method: 'GET' }, tokenDetailSchema);
+}

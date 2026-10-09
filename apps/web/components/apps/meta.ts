@@ -11,7 +11,7 @@ import {
   type IconProps,
 } from '@/components/xp/Icons';
 
-export type AppId = 'welcome' | 'launch' | 'explore' | 'callouts' | 'portfolio' | 'theorem' | 'about' | 'recycle';
+export type AppId = 'welcome' | 'launch' | 'explore' | 'callouts' | 'portfolio' | 'theorem' | 'about' | 'recycle' | 'token';
 
 export type AppMeta = {
   id: AppId;
@@ -93,6 +93,15 @@ export const APPS: Record<AppId, AppMeta> = {
     w: 400,
     h: 400,
     maximizable: false,
+  },
+  token: {
+    id: 'token',
+    title: 'Token Detail',
+    label: 'Token',
+    description: 'One coin: curve, theorem, links',
+    Icon: TheoremIcon,
+    w: 520,
+    h: 460,
   },
   recycle: {
     id: 'recycle',

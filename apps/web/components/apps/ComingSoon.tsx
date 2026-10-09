@@ -8,15 +8,6 @@ import styles from './apps.module.css';
 
 /** Setup-style placeholder for programs that land in later build weeks (docs/BRIEF.md §14). */
 const PLANNED: Partial<Record<AppId, { week: number; progress: number; features: string[] }>> = {
-  explore: {
-    week: 2,
-    progress: 25,
-    features: [
-      'Every Pons coin, sorted by Latest, Volume, Rigor or MCap',
-      'hood.exe launches and All Pons tabs',
-      'Graduation progress on each card',
-    ],
-  },
   callouts: {
     week: 3,
     progress: 10,

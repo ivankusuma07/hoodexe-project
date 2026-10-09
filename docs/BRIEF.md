@@ -435,6 +435,7 @@ Day 7: 50+ launches · Day 14: $10k+ volume · Day 30: 200+ wallets, 500+ callou
 - ~~Dev: metadata caps~~ — done (§5.2). Pons: referral / interface-fee program.
 - Bix: "fee sharing → holders pro-rata" (§5.2) has no Pons equivalent. `buybackEnabled` is the only fee switch, and it is creator-funded buyback & lock vesting over 5 years, split with Pons. The wizard shows it as an opt-in checkbox (default off). Confirm or drop.
 - ~~Dev: wizard launches a test token on the Anvil fork~~ — done 9 Oct 2026: `pnpm fork` serves a snapshot of 4663 with Pons V2; ETH and USDG dev-buy launches ran through the wizard UI, SIWE, `/ipfs` and `/launches`.
+- Bix — RPC provider is now blocking: after a day of dev traffic the public RPC (Cloudflare) answers this machine's Node clients with 403 challenges, batches first. Pons V2 sees ~2,400 launches a day and address-less `eth_getLogs` is capped at 30k blocks, so all-of-Pons volume and candles need Envio (HyperSync). Until then Explore runs on an interim RPC index (recent launches, no Volume sort).
 - Dev: SIWE moved forward from week 3, since `/ipfs` needs a session; the wizard signs in before pinning. The DeepSeek "thinking off" switch is sent as `thinking: {type: "disabled"}` (third-party V4 docs). Confirm it against api-docs.deepseek.com once a key is in place.
 - Dev: `/ipfs` and `/launches` use the server's cached rigor score, never the client's, so a forged score can't reach IPFS or the launch record.
 

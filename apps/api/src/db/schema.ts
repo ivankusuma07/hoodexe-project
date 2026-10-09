@@ -1,4 +1,4 @@
-import { index, integer, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, boolean, index, integer, jsonb, numeric, pgTable, smallint, text, timestamp } from 'drizzle-orm/pg-core';
 
 /** docs/BRIEF.md §9. Callouts, reactions and profiles arrive with Callouts.exe in week 3. */
 
@@ -41,3 +41,43 @@ export const launches = pgTable(
   },
   (t) => [index('launches_creator_idx').on(t.creator)],
 );
+
+/**
+ * Pons V2 launches for Explore. Filled by the interim RPC index (services/tokenIndex.ts) until Envio takes
+ * over; third-party names, symbols, logos and descriptions are untrusted and only ever rendered as text.
+ */
+export const tokens = pgTable(
+  'tokens',
+  {
+    tokenAddress: text('token_address').primaryKey(),
+    curveAddress: text('curve_address').notNull(),
+    deployer: text('deployer').notNull(),
+    pairToken: text('pair_token').notNull(),
+    blockNumber: bigint('block_number', { mode: 'number' }).notNull(),
+    launchedAt: timestamp('launched_at', { withTimezone: true }).notNull(),
+    name: text('name').notNull(),
+    symbol: text('symbol').notNull(),
+    logo: text('logo').notNull(),
+    description: text('description').notNull(),
+    /** Launched through hood.exe: the description parses as ours. */
+    hood: boolean('hood').notNull().default(false),
+    statement: text('statement'),
+    metadataCid: text('metadata_cid'),
+    /** Server-side score for the statement, never the number in the description. */
+    rigorScore: integer('rigor_score'),
+    graduationThreshold: numeric('graduation_threshold', { precision: 78, scale: 0 }).notNull(),
+    /** getLaunchedToken().phase: 0 curve, 1 swept, 2 pool, 3 rescued. */
+    phase: smallint('phase').notNull().default(0),
+    quoteReserve: numeric('quote_reserve', { precision: 78, scale: 0 }),
+    tokenReserve: numeric('token_reserve', { precision: 78, scale: 0 }),
+    realQuoteReserve: numeric('real_quote_reserve', { precision: 78, scale: 0 }),
+    stateUpdatedAt: timestamp('state_updated_at', { withTimezone: true }),
+  },
+  (t) => [index('tokens_block_idx').on(t.blockNumber), index('tokens_hood_idx').on(t.hood, t.blockNumber)],
+);
+
+/** Small key/value cursor store for background jobs (e.g. the last indexed block). */
+export const indexState = pgTable('index_state', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+});

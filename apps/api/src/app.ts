@@ -14,6 +14,7 @@ import { authRoutes } from './routes/auth';
 import { ipfsRoutes } from './routes/ipfs';
 import { launchRoutes } from './routes/launches';
 import { scoreRoutes } from './routes/score';
+import { tokenRoutes } from './routes/tokens';
 
 export type Deps = {
   env: Env;
@@ -99,5 +100,6 @@ export async function buildApp(deps: Deps) {
   await app.register(scoreRoutes);
   await app.register(ipfsRoutes);
   await app.register(launchRoutes);
+  await app.register(tokenRoutes);
   return app;
 }

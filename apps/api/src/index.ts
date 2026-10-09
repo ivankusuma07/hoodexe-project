@@ -6,6 +6,7 @@ import { memoryKv, redisKv } from './kv';
 import { rpcChainReader } from './services/chain';
 import { devPinner, pinataPinner } from './services/pinner';
 import { deepseekScorer, offlineScorer } from './services/scorer';
+import { rpcLaunchSource, tokenIndex } from './services/tokenIndex';
 
 const env = loadEnv();
 const { db, close: closeDb } = await connectPostgres(env.DATABASE_URL);
@@ -25,8 +26,20 @@ const app = await buildApp({
 const standIns = [!env.REDIS_URL && 'in-memory KV', !env.DEEPSEEK_API_KEY && 'offline scorer', !env.PINATA_JWT && 'dev pinner (nothing published)'].filter(Boolean);
 if (standIns.length) app.log.warn(`Running with stand-ins: ${standIns.join(', ')}`);
 
+const index =
+  env.TOKEN_INDEX === 'rpc'
+    ? tokenIndex(db, rpcLaunchSource(env.RPC_URL_SERVER), {
+        backfillBlocks: env.TOKEN_INDEX_BACKFILL_BLOCKS,
+        chunkBlocks: 500_000,
+        refreshRecent: 300,
+        log: (m) => app.log.warn(m),
+      })
+    : null;
+index?.start();
+
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {
+    index?.stop();
     await app.close();
     await Promise.all([closeDb(), kv.close()]);
     process.exit(0);

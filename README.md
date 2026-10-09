@@ -43,6 +43,7 @@ Open the web app on `localhost`, not `127.0.0.1`, so the session cookie reaches 
 - Production refuses to start on either stand-in, without Redis, or with the dev session secret.
 - API tests run on in-process Postgres (PGlite) and need no Docker.
 - Schema changes: edit `apps/api/src/db/schema.ts`, then `pnpm --filter @hood/api db:generate`.
+- Explore's `/tokens` is fed by an interim index inside the API (`TOKEN_INDEX=rpc`, the default): it follows the factory's `TokenLaunched` logs from `TOKEN_INDEX_BACKFILL_BLOCKS` back (300k ≈ 8 h) and refreshes curve state for hood.exe tokens and the 300 newest launches. Envio replaces it; set `TOKEN_INDEX=off` then. It needs a dedicated `RPC_URL_SERVER`: the public RPC starts answering a busy client with Cloudflare challenges.
 
 ### Local chain (fork of 4663)
 
