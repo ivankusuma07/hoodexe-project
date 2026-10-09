@@ -46,7 +46,10 @@ const envSchema = z
 export type Env = z.output<typeof envSchema>;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const parsed = envSchema.safeParse(source);
+  // `KEY=` in a .env file (or a blank Railway variable) means unset, so defaults and checks apply.
+  // Without this an empty SESSION_SECRET slips past the default and cookie signing breaks.
+  const present = Object.fromEntries(Object.entries(source).filter(([, v]) => v !== undefined && v.trim() !== ''));
+  const parsed = envSchema.safeParse(present);
   if (!parsed.success) {
     const lines = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`);
     throw new Error(`Invalid environment:\n${lines.join('\n')}`);

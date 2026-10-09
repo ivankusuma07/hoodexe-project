@@ -243,6 +243,13 @@ describe('memoryKv', () => {
 });
 
 describe('loadEnv', () => {
+  it('treats empty variables as unset', () => {
+    const env = loadEnv({ DATABASE_URL: 'postgres://x', SESSION_SECRET: '', CORS_ORIGINS: ' ', REDIS_URL: '' });
+    expect(env.SESSION_SECRET.length).toBeGreaterThanOrEqual(32);
+    expect(env.CORS_ORIGINS).toEqual(['http://localhost:3000']);
+    expect(env.REDIS_URL).toBeUndefined();
+  });
+
   it('refuses to run production on stand-ins', () => {
     expect(() => loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://x' })).toThrow(/DEEPSEEK_API_KEY[\s\S]*SESSION_SECRET/);
   });
