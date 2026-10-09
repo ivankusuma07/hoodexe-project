@@ -9,7 +9,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "check:pons": "tsx scripts/check-pons.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sync:pairs": "tsx scripts/sync-pairs.ts"
   },
   "peerDependencies": {
     "viem": "^2"

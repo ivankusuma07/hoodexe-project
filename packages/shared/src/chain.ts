@@ -18,6 +18,7 @@ export function robinhoodChain(rpcUrl: string = PUBLIC_RPC_MAINNET) {
     blockExplorers: {
       default: { name: 'Blockscout', url: EXPLORER_MAINNET },
     },
+    contracts: { multicall3: { address: MULTICALL3 } },
   });
 }
 
@@ -33,6 +34,9 @@ export function robinhoodTestnet(rpcUrl: string = PUBLIC_RPC_TESTNET) {
     testnet: true,
   });
 }
+
+/** Canonical Multicall3, verified deployed on 4663. */
+export const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11' as const;
 
 export const txUrl = (hash: string) => `${EXPLORER_MAINNET}/tx/${hash}`;
 export const addressUrl = (address: string) => `${EXPLORER_MAINNET}/address/${address}`;
