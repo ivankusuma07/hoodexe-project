@@ -43,6 +43,7 @@ Without `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` the wallet modal offers browser-i
 docker compose up -d                           # Postgres 17 on :54320, Redis 7 on :63790
 cp apps/api/.env.example apps/api/.env
 pnpm dev:api                                   # http://localhost:8787, migrations run on start
+pnpm --filter @hood/api dev:worker             # system callouts every 10 s (needs REDIS_URL)
 ```
 
 Open the web app on `localhost`, not `127.0.0.1`, so the session cookie reaches the API.
@@ -52,6 +53,7 @@ Open the web app on `localhost`, not `127.0.0.1`, so the session cookie reaches 
 - Production refuses to start on either stand-in, without Redis, or with the dev session secret.
 - API tests run on in-process Postgres (PGlite) and need no Docker.
 - Schema changes: edit `apps/api/src/db/schema.ts`, then `pnpm --filter @hood/api db:generate`.
+- Callouts: `GET/POST /callouts`, reactions, `PUT /profile` (nickname) and the `/ws` live feed. The worker (same package, `src/worker.ts`) posts "$TICKER launched / graduated" and ≥ 0.5 ETH buys for hood.exe coins and reaches the API's WebSockets through Redis pub/sub; on Railway run it as a second service from the same image. Without `DEEPSEEK_API_KEY` callout moderation is the blocklist only (refused in production). `OFFICIAL_WALLETS` and `BLOCKLIST_EXTRA` are comma-separated.
 - Explore's `/tokens` table: launches come from the indexer (`ENVIO_GRAPHQL_URL`); names, logos and live reserves from `RPC_URL_SERVER` (eth_call only, so a free-tier RPC is fine). Without `ENVIO_GRAPHQL_URL` the API falls back to scanning RPC logs, which free RPC tiers cap at a few blocks. `TOKEN_INDEX=off` disables it.
 - Token Detail's chart (`/tokens/:address/candles`), trades (`/tokens/:address/trades`) and Explore's Volume sort read the indexer directly; without `ENVIO_GRAPHQL_URL` the first two answer 503 and Volume is hidden.
 

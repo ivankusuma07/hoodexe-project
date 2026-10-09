@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import type { CalloutPage } from '@/lib/api';
 import { useLiveStatus } from '@/lib/live';
+import { useTray } from '@/store/tray';
 import { CalloutFeed } from './CalloutFeed';
 import styles from './Callouts.module.css';
 
@@ -12,6 +13,8 @@ export function Callouts() {
   const [live, setLive] = useState<CalloutPage['live'] | null>(null);
   const onLiveCounts = useCallback((l: CalloutPage['live']) => setLive(l), []);
   const isLive = status === 'live';
+  const balloons = useTray((s) => s.balloonsEnabled);
+  const setBalloonsEnabled = useTray((s) => s.setBalloonsEnabled);
 
   return (
     <div className={styles.window}>
@@ -25,6 +28,9 @@ export function Callouts() {
             <span className={styles.muted}> (24 h)</span>
           </span>
         )}
+        <label className={styles.toggle} title="Pop up new callouts from the tray while this window is closed">
+          <input type="checkbox" checked={balloons} onChange={(e) => setBalloonsEnabled(e.target.checked)} /> Tray balloons
+        </label>
       </div>
       <CalloutFeed onLiveCounts={onLiveCounts} />
     </div>

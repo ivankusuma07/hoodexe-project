@@ -73,3 +73,4 @@ button.ticker:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) {
   .dotLive, .flash { animation: none; }
 }
+.toggle { margin-left: auto; display: flex; align-items: center; gap: 3px; color: #4b4b4b; white-space: nowrap; }

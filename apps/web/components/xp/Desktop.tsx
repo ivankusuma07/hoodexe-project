@@ -7,12 +7,14 @@ import { APP_COMPONENTS } from '@/components/apps';
 import { logout } from '@/lib/api';
 import { isAddress } from 'viem';
 import { openApp, openToken } from '@/lib/openApp';
+import { useTray } from '@/store/tray';
 import { useWindows } from '@/store/windows';
 import { DesktopIcons } from './DesktopIcons';
 import { MessageBox } from './Dialog';
 import { BOOT_MS, BootScreen, WELCOME_MS, WelcomeScreen } from './Boot';
 import { LogOffDialog, OffScreen, ShutDownDialog } from './Power';
 import { StartMenu } from './StartMenu';
+import { Balloons } from './Balloons';
 import { Taskbar } from './Taskbar';
 import { Wallpaper } from './Wallpaper';
 import { Window } from './Window';
@@ -24,6 +26,7 @@ export function Desktop() {
   const windows = useWindows((s) => s.windows);
   const activeId = useWindows((s) => s.activeId);
   const closeAll = useWindows((s) => s.closeAll);
+  const unread = useTray((s) => s.unread);
   const { disconnect } = useDisconnect();
 
   const [selected, setSelected] = useState<AppId | null>(null);
@@ -116,7 +119,8 @@ export function Desktop() {
         />
       )}
 
-      <Taskbar startOpen={startOpen} onStartToggle={() => setStartOpen((o) => !o)} />
+      <Taskbar startOpen={startOpen} onStartToggle={() => setStartOpen((o) => !o)} unreadCallouts={unread} />
+      <Balloons />
 
       {overlay === 'shutdown' && (
         <ShutDownDialog
