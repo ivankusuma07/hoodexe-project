@@ -1,11 +1,26 @@
-/** Rolling-hills wallpaper drawn from gradients only (no Microsoft image). */
+const fill = { position: 'absolute', inset: 0, width: '100%', height: '100%' } as const;
+
+/** Photo wallpaper over the gradient hills, which show while it loads or if it fails. */
 export function Wallpaper() {
+  return (
+    <>
+      <Hills />
+      <div
+        aria-hidden="true"
+        style={{ ...fill, background: 'url(/image/xp-bg.webp) center / cover no-repeat' }}
+      />
+    </>
+  );
+}
+
+/** Rolling-hills wallpaper drawn from gradients only. */
+function Hills() {
   return (
     <svg
       viewBox="0 0 1600 1000"
       preserveAspectRatio="xMidYMid slice"
       aria-hidden="true"
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
+      style={{ ...fill, display: 'block' }}
     >
       <defs>
         <linearGradient id="wp-sky" x1="0" y1="0" x2="0" y2="1">
