@@ -139,7 +139,7 @@ On open: `canLaunch(wallet)`; if false, XP dialog "Pons launches are invite-only
 | 3 Economics | Dev buy | Optional, in pair asset |
 | 3 Economics | Socials | X, Telegram, website (prefilled `https://hood.fun`) |
 
-Final page: read-only Canvas preview of the Pons curve (with graduation threshold), fee summary, confirmation "Launch settings can never be changed. Continue?". Metadata length caps come from `PonsV2LaunchDeployer.sol`.
+Final page: read-only Canvas preview of the Pons curve (with graduation threshold), fee summary, confirmation "Launch settings can never be changed. Continue?". On-chain byte caps (`PonsV2LaunchDeployer.sol`): name 64, symbol 16, logo 512, description 2048, each social 256.
 
 **Fees shown**: Pons launch fee (read from `launchFee()`, never hard-coded) + est. gas; dev buy + 1% trade fee. **No platform fee at MVP.**
 
@@ -227,7 +227,7 @@ No Pons API: we call contracts with viem and index the factory ourselves. V1 tok
 - `TokenParams`: name, symbol, logo, description, socials (X, Telegram, Discord, website, Farcaster), creator fee recipient, creator tax, buyback on/off, `expectedEconomics` pin, CREATE2 salt — all locked.
 - Launch fee 0.0005 ETH via `launchFee()`. Curve fee 100 bps. Caps: curve fee ≤ 10%, creator tax ≤ 10%, total ≤ 20%.
 - Pair assets: ETH (graduates at 4.2 ETH), USDG, cbBTC, ~33 stock/ETF tokens; check `approvedPairTokens`, `pairTokenEconomics`.
-- Snipe tax 99% decaying to 0 in seconds — read `currentSnipeTaxBps(recipient)`.
+- Snipe tax applies to buys only, deducted from input with the fee and creator tax. Live setting (9 Oct 2026): 99% decaying over 3 s (docs say 5 s; source default 15 s) — always read `currentSnipeTaxBps(recipient)` on the curve.
 - Graduation inside the finishing buy → full-range Uniswap V4 pool (fee 0, tick spacing 200, PonsV2MemeHook), liquidity locked forever. Last pre-graduation buy is clamped and refunded; `minTokensOut` bounds price not quantity.
 - Phase from `getLaunchedToken().phase` (0 curve / 1 swept / 2 pool / 3 rescued), never from balances.
 - ERC-20 pairs need approvals (curve for buys, router for `launchAndBuy`).
@@ -429,9 +429,9 @@ Own contracts / custom curves; fee wrapper; custody; multi-chain; native app; DA
 Day 7: 50+ launches · Day 14: $10k+ volume · Day 30: 200+ wallets, 500+ callouts · < 2 s mobile load, zero critical bugs.
 
 ### Still open
-- Kickoff: `cast call 0x7eD5…EC7e "canLaunch(address)(bool)" <wallet>`; if false, ask Pons to whitelist house wallets.
+- ~~Kickoff `canLaunch` check~~ — done 9 Oct 2026: `launchEnabled = true`, public launches are open (`pnpm --filter @hood/shared check:pons`).
 - Bix: domain + 10 accounts; reference preview / screenshots; RPC provider; confirm curve-selector + platform-fee removal; `OFFICIAL_WALLETS`; house tokens; lawyer review + geo-blocking; DeepSeek balance (USD 20); pricing + milestones; soft-launch plan.
-- Dev: metadata caps from `PonsV2LaunchDeployer.sol`. Pons: referral / interface-fee program.
+- ~~Dev: metadata caps~~ — done (§5.2). Pons: referral / interface-fee program.
 
 ---
 
