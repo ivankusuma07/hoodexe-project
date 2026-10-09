@@ -124,6 +124,35 @@ export function fetchToken(address: string): Promise<TokenDetail> {
   return request(`/tokens/${encodeURIComponent(address)}`, { method: 'GET' }, tokenDetailSchema);
 }
 
+const holdingSchema = z.object({
+  token: z.string(),
+  curve: z.string(),
+  symbol: z.string(),
+  name: z.string(),
+  logo: z.string(),
+  pair: z.object({ address: z.string(), symbol: z.string(), decimals: z.number() }),
+  hood: z.boolean(),
+  rigorScore: z.number().nullable(),
+  phase: z.number(),
+  launchedByMe: z.boolean(),
+  balance: z.number(),
+  price: z.number().nullable(),
+  value: z.number().nullable(),
+  costBasis: z.number().nullable(),
+  pnl: z.number().nullable(),
+  pnlPct: z.number().nullable(),
+});
+export type Holding = z.infer<typeof holdingSchema>;
+
+/** `tradeHistory` is false without the indexer: holdings then cover only the wallet's launches, with no cost basis. */
+const portfolioSchema = z.object({ wallet: z.string(), holdings: z.array(holdingSchema), launches: z.array(tokenItemSchema), tradeHistory: z.boolean() });
+export type PortfolioData = z.infer<typeof portfolioSchema>;
+
+/** GET /portfolio/:wallet */
+export function fetchPortfolio(wallet: string): Promise<PortfolioData> {
+  return request(`/portfolio/${encodeURIComponent(wallet)}`, { method: 'GET' }, portfolioSchema);
+}
+
 export const CHART_INTERVALS = ['1m', '5m', '15m', '1h', '1d'] as const;
 export type ChartInterval = (typeof CHART_INTERVALS)[number];
 

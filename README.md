@@ -22,7 +22,9 @@ packages/shared/   Chain config, Pons V2 ABIs and quote maths, zod schemas, shar
 - **Launch.exe**: three-page wizard (identity, theorem with live KaTeX preview and rigor score, economics), then a review page with curve preview and dev-buy quote. Signs in with SIWE, pins to IPFS, launches via `launchToken` or `launchAndBuy`.
 - **Explore.exe**: "hood.exe launches" / "All Pons" tabs, sort by Latest, Volume, Rigor or MCap.
 - **Token Detail**: candle chart (1m–1d), last trades, graduation progress, and curve buy/sell with approvals, slippage and snipe-tax handling. Graduated coins link out to Pons.
-- Still placeholders: Callouts, tray balloons, legal windows.
+- **Callouts.exe**: live feed with reactions and nicknames; tray balloons when it is closed.
+- **Portfolio**: holdings marked at the curve price with unrealized P&L (average cost from indexed trades), sort by Rigor, Value or P&L %, Export CSV; "My launches" tab. Rows open Token Detail.
+- Still placeholders: legal windows.
 
 ## Develop
 

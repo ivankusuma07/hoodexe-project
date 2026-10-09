@@ -6,7 +6,7 @@ import { Callouts } from './callouts/Callouts';
 import { Explore } from './explore/Explore';
 import { TokenDetail } from './token/TokenDetail';
 import { Launch } from './launch/Launch';
-import { Portfolio } from './Portfolio';
+import { Portfolio } from './portfolio/Portfolio';
 import { RecycleBin } from './RecycleBin';
 import { TheoremBoard } from './TheoremBoard';
 import { Welcome } from './Welcome';

@@ -71,8 +71,8 @@ export const APPS: Record<AppId, AppMeta> = {
     label: 'Portfolio',
     description: 'Your launches and holdings',
     Icon: PortfolioIcon,
-    w: 420,
-    h: 260,
+    w: 540,
+    h: 360,
   },
   theorem: {
     id: 'theorem',
