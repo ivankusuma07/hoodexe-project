@@ -235,3 +235,17 @@ describe('GET /ws', () => {
     ws.terminate();
   });
 });
+
+describe('CORS', () => {
+  it('lets the web app preflight PUT /profile with credentials', async () => {
+    const res = await ctx.app.inject({
+      method: 'OPTIONS',
+      url: '/profile',
+      headers: { origin: 'http://localhost:3000', 'access-control-request-method': 'PUT', 'access-control-request-headers': 'content-type' },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(String(res.headers['access-control-allow-methods'])).toContain('PUT');
+    expect(res.headers['access-control-allow-credentials']).toBe('true');
+    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+  });
+});

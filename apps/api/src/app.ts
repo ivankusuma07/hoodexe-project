@@ -74,7 +74,8 @@ export async function buildApp(deps: Deps) {
   app.decorate('deps', { ...deps, now: deps.now ?? (() => new Date()) });
   app.decorateRequest('wallet', null);
 
-  await app.register(cors, { origin: env.CORS_ORIGINS, credentials: true });
+  // The default allows GET/HEAD/POST only; PUT /profile needs its preflight to pass too.
+  await app.register(cors, { origin: env.CORS_ORIGINS, credentials: true, methods: ['GET', 'HEAD', 'POST', 'PUT'] });
   await app.register(cookie, { secret: env.SESSION_SECRET });
   // Clients only listen on /ws; 1 KB is plenty for anything a browser might send.
   await app.register(websocket, { options: { maxPayload: 1_024 } });
