@@ -118,7 +118,8 @@ export async function buildApp(deps: Deps) {
     return reply.code(500).send({ error: 'Something went wrong on our side.' });
   });
 
-  app.get('/health', async () => {
+  // 503 when a dependency is down, so the host's health check holds back a broken deploy.
+  app.get('/health', async (_req, reply) => {
     const [db, kv] = await Promise.all([
       deps.db.execute(sql`select 1`).then(
         () => true,
@@ -126,7 +127,7 @@ export async function buildApp(deps: Deps) {
       ),
       deps.kv.ping().catch(() => false),
     ]);
-    return { ok: db && kv, db, kv };
+    return reply.code(db && kv ? 200 : 503).send({ ok: db && kv, db, kv });
   });
 
   await app.register(authRoutes);

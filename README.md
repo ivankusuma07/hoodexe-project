@@ -3,6 +3,7 @@
 Token launchpad for Robinhood Chain in a Luna-style desktop. Launches and trades route to Pons V2.
 
 - Spec: [docs/BRIEF.md](docs/BRIEF.md) (v1.0 + v1.1 merged; v1.1 wins on conflicts)
+- Deploying: [docs/DEPLOY.md](docs/DEPLOY.md) (Vercel, Railway, Envio hosted)
 - Original briefs: `hood-exe-dev-brief.md` (v1.0), `hood.exe_developer_briefv1.1.md` (v1.1)
 
 ## Layout
@@ -14,7 +15,7 @@ apps/indexer/      Envio HyperIndex: Pons V2 launches, curve trades, candles, gr
 packages/shared/   Chain config, Pons V2 ABIs and quote maths, zod schemas, shared helpers
 ```
 
-`apps/worker` arrives with Callouts.
+The worker (`apps/api/src/worker.ts`) ships in the API image as a second Railway service.
 
 ## What works
 

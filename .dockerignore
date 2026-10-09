@@ -1,0 +1,11 @@
+**/node_modules
+**/.next
+**/.env*
+!**/.env.example
+**/*.tsbuildinfo
+.git
+.fork
+.vercel
+apps/web
+apps/indexer/generated
+docs

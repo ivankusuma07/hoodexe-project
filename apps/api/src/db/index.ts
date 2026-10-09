@@ -6,6 +6,8 @@ export { schema };
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 const migrationsFolder = fileURLToPath(new URL('../../drizzle', import.meta.url));
+/** Arbitrary advisory-lock key for migrations (the chain id). */
+const MIGRATION_LOCK = 4663;
 
 /** Postgres over postgres.js, with migrations applied. Returns a close function for shutdown. */
 export async function connectPostgres(url: string): Promise<{ db: Db; close: () => Promise<void> }> {
@@ -14,7 +16,15 @@ export async function connectPostgres(url: string): Promise<{ db: Db; close: () 
   const { migrate } = await import('drizzle-orm/postgres-js/migrator');
   const sql = postgres(url, { max: 10, onnotice: () => {} });
   const db = drizzle(sql, { schema });
-  await migrate(db, { migrationsFolder });
+  // The API and the worker start together on deploy; one migrates while the other waits.
+  const lock = await sql.reserve();
+  try {
+    await lock`select pg_advisory_lock(${MIGRATION_LOCK})`;
+    await migrate(db, { migrationsFolder });
+  } finally {
+    await lock`select pg_advisory_unlock(${MIGRATION_LOCK})`.catch(() => {});
+    lock.release();
+  }
   return { db, close: () => sql.end({ timeout: 5 }) };
 }
 
