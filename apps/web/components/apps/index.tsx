@@ -6,6 +6,7 @@ import { Callouts } from './callouts/Callouts';
 import { Explore } from './explore/Explore';
 import { TokenDetail } from './token/TokenDetail';
 import { Launch } from './launch/Launch';
+import { Privacy, Risk, Terms } from './legal/Legal';
 import { Portfolio } from './portfolio/Portfolio';
 import { RecycleBin } from './RecycleBin';
 import { TheoremBoard } from './TheoremBoard';
@@ -21,4 +22,7 @@ export const APP_COMPONENTS: Record<AppId, ComponentType<{ win: WindowState }>> 
   about: About,
   recycle: RecycleBin,
   token: TokenDetail,
+  terms: Terms,
+  risk: Risk,
+  privacy: Privacy,
 };

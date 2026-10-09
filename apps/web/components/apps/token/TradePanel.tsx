@@ -12,6 +12,7 @@ import type { TokenDetail } from '@/lib/api';
 import { useIdentity } from '@/lib/identity';
 import { useLiveCurve, useTradeBalances } from '@/lib/pons/curve';
 import { txErrorMessage } from '@/lib/pons/launch';
+import { withRiskAccepted } from '@/lib/risk';
 import { chain, wagmiConfig } from '@/lib/wagmi';
 import styles from './TradePanel.module.css';
 
@@ -301,7 +302,7 @@ export function TradePanel({ token: t, paused = false }: { token: TokenDetail; p
           variant={side === 'buy' ? 'success' : 'danger'}
           className={styles.action}
           disabled={busy || !!blocked || !amountIn || insufficient || !slippageOk || !live.data}
-          onClick={() => void execute()}
+          onClick={() => withRiskAccepted(() => void execute())}
         >
           {busy ? status.label : action}
         </Button>

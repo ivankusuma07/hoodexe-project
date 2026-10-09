@@ -5,6 +5,7 @@ import { Button } from '@/components/xp/Button';
 import { GroupBox } from '@/components/xp/Controls';
 import { HoodLogo } from '@/components/xp/Icons';
 import { Wordmark } from '@/components/xp/Wordmark';
+import { openApp } from '@/lib/openApp';
 import { useWindows, type WindowState } from '@/store/windows';
 import styles from './apps.module.css';
 
@@ -42,6 +43,17 @@ export function About({ win }: { win: WindowState }) {
         </GroupBox>
         <p className={styles.fineprint}>
           Pons V2 contracts are unaudited. Memecoins can go to zero. Not affiliated with Robinhood Markets, Inc.
+        </p>
+        <p className={styles.legalLinks}>
+          <button type="button" onClick={() => openApp('terms')}>
+            Terms of Use
+          </button>
+          <button type="button" onClick={() => openApp('risk')}>
+            Risk disclosure
+          </button>
+          <button type="button" onClick={() => openApp('privacy')}>
+            Privacy notice
+          </button>
         </p>
       </div>
       <div className={styles.footerRow}>

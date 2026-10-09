@@ -30,6 +30,7 @@ import {
 } from './draft';
 import { EconomicsPage } from './EconomicsPage';
 import { IdentityPage } from './IdentityPage';
+import { withRiskAccepted } from '@/lib/risk';
 import { ReviewPage } from './ReviewPage';
 import { TheoremPage } from './TheoremPage';
 import styles from './Launch.module.css';
@@ -174,7 +175,7 @@ export function Launch({ win }: { win: WindowState }) {
           &lt; Back
         </Button>
         {page === 'review' ? (
-          <Button variant="primary" onClick={() => setDeploy({ state: 'confirm' })} disabled={launchBlocked}>
+          <Button variant="primary" onClick={() => withRiskAccepted(() => setDeploy({ state: 'confirm' }))} disabled={launchBlocked}>
             Launch
           </Button>
         ) : (

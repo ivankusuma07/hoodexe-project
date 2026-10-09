@@ -15,6 +15,7 @@ import { BOOT_MS, BootScreen, WELCOME_MS, WelcomeScreen } from './Boot';
 import { LogOffDialog, OffScreen, ShutDownDialog } from './Power';
 import { StartMenu } from './StartMenu';
 import { Balloons } from './Balloons';
+import { RiskDialog } from './RiskDialog';
 import { Taskbar } from './Taskbar';
 import { Wallpaper } from './Wallpaper';
 import { Window } from './Window';
@@ -121,6 +122,7 @@ export function Desktop() {
 
       <Taskbar startOpen={startOpen} onStartToggle={() => setStartOpen((o) => !o)} unreadCallouts={unread} />
       <Balloons />
+      <RiskDialog />
 
       {overlay === 'shutdown' && (
         <ShutDownDialog

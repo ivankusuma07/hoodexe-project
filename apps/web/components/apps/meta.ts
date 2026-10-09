@@ -6,12 +6,14 @@ import {
   InfoIcon,
   LaunchIcon,
   PortfolioIcon,
+  LockIcon,
   RecycleBinIcon,
   TheoremIcon,
+  WarningIcon,
   type IconProps,
 } from '@/components/xp/Icons';
 
-export type AppId = 'welcome' | 'launch' | 'explore' | 'callouts' | 'portfolio' | 'theorem' | 'about' | 'recycle' | 'token';
+export type AppId = 'welcome' | 'launch' | 'explore' | 'callouts' | 'portfolio' | 'theorem' | 'about' | 'recycle' | 'token' | 'terms' | 'risk' | 'privacy';
 
 export type AppMeta = {
   id: AppId;
@@ -102,6 +104,33 @@ export const APPS: Record<AppId, AppMeta> = {
     Icon: TheoremIcon,
     w: 720,
     h: 540,
+  },
+  terms: {
+    id: 'terms',
+    title: 'Terms of Use',
+    label: 'Terms of Use',
+    description: 'The rules for using hood.exe',
+    Icon: InfoIcon,
+    w: 500,
+    h: 460,
+  },
+  risk: {
+    id: 'risk',
+    title: 'Risk disclosure',
+    label: 'Risk disclosure',
+    description: 'What can go wrong',
+    Icon: WarningIcon,
+    w: 500,
+    h: 460,
+  },
+  privacy: {
+    id: 'privacy',
+    title: 'Privacy notice',
+    label: 'Privacy notice',
+    description: 'What hood.exe stores about you',
+    Icon: LockIcon,
+    w: 500,
+    h: 460,
   },
   recycle: {
     id: 'recycle',
