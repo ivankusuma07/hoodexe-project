@@ -122,3 +122,16 @@ textarea { resize: vertical; }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* Mobile browsers: the visible viewport, not the one behind the address bar. */
+@supports (height: 100dvh) {
+  html, body { height: 100dvh; }
+}
+
+@media (max-width: 640px) {
+  /* A finger-sized taskbar that clears the iPhone home indicator (viewport-fit=cover). */
+  :root { --taskbar-h: calc(40px + env(safe-area-inset-bottom, 0px)); }
+  body { font-size: 12px; }
+  /* iOS Safari zooms into any field under 16px when it is focused. */
+  input[type="text"], input[type="number"], input[type="search"], input:not([type]), textarea, select { font-size: 16px; }
+}

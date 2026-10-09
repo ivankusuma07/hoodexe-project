@@ -34,3 +34,10 @@
 .up { color: var(--good); }
 .down { color: var(--bad); }
 .muted { color: #6a6a6a; }
+
+@media (max-width: 640px) {
+  .table td { padding: 7px 3px; }
+  .tag { display: none; }
+  /* The percentage goes under the amount so P&L fits a phone. */
+  .pct { display: block; }
+}

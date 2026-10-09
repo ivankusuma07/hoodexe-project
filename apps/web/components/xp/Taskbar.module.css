@@ -148,6 +148,7 @@
 }
 
 @media (max-width: 640px) {
+  .taskbar { padding-bottom: env(safe-area-inset-bottom, 0px); }
   .start { padding: 0 12px 0 6px; margin-right: 4px; font-size: 16px; }
   .tab { flex-basis: 44px; padding: 0 6px; }
   .tabTitle { display: none; }

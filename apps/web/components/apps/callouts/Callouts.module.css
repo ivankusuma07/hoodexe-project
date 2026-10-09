@@ -74,3 +74,10 @@ button.ticker:hover { text-decoration: underline; }
   .dotLive, .flash { animation: none; }
 }
 .toggle { margin-left: auto; display: flex; align-items: center; gap: 3px; color: #4b4b4b; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .item { padding: 9px 10px; }
+  .reactions { gap: 8px; }
+  .reaction { min-height: 32px; min-width: 48px; font-size: 13px; border-radius: 16px; }
+  .toggle input { width: 18px; height: 18px; }
+}

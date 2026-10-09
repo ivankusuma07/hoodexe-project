@@ -114,9 +114,10 @@
 @media (max-width: 640px) {
   .window:not(.dialog) {
     left: 0 !important;
-    top: 0 !important;
+    /* Below the notch / status bar when the page runs edge to edge. */
+    top: env(safe-area-inset-top, 0px) !important;
     width: 100% !important;
-    height: calc(100% - var(--taskbar-h)) !important;
+    height: calc(100% - var(--taskbar-h) - env(safe-area-inset-top, 0px)) !important;
     border-radius: 0;
     border-width: 0;
   }

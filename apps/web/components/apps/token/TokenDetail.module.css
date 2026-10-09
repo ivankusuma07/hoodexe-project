@@ -52,8 +52,11 @@
 .panel { padding: 10px; }
 
 @media (max-width: 640px) {
-  .layout { grid-template-columns: 1fr; overflow: auto; }
-  .main { overflow: visible; }
-  .side { border-left: 0; border-top: 1px solid #d6d2c2; }
+  /* One scrolling column: each part keeps its natural height instead of sharing the window's. */
+  .layout { grid-template-columns: 1fr; grid-auto-rows: auto; align-content: start; overflow: auto; }
+  .main { overflow: visible; min-height: auto; }
+  .tabs { min-height: 280px; }
+  .side { overflow: visible; min-height: auto; border-left: 0; border-top: 1px solid #d6d2c2; }
+  .interval, .intervalOn { padding: 4px 9px; font-size: 11px; }
   .stats { width: 100%; justify-content: space-between; }
 }

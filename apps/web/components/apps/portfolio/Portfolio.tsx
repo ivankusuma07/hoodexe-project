@@ -171,7 +171,13 @@ function HoldingsTab({ holdings, wallet, tradeHistory }: { holdings: Holding[]; 
                 <td className={styles.num}>{compact(h.balance)}</td>
                 <td className={styles.num}>{h.phase === 0 ? formatQuote(h.value, h.pair.symbol) : <span className={styles.muted}>{PHASE_LABEL[h.phase] ?? '—'}</span>}</td>
                 <td className={`${styles.num} ${tone(h.pnl) ?? ''}`} title={h.costBasis != null ? `Cost basis ${formatQuote(h.costBasis, h.pair.symbol)}` : 'Cost basis unknown'}>
-                  {h.pnl == null ? '—' : `${signed(h.pnl, h.pair.symbol)} ${pct(h.pnlPct)}`}
+                  {h.pnl == null ? (
+                    '—'
+                  ) : (
+                    <>
+                      {signed(h.pnl, h.pair.symbol)} <span className={styles.pct}>{pct(h.pnlPct)}</span>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

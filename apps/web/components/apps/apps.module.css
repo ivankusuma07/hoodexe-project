@@ -94,3 +94,7 @@
 .legalLinks { display: flex; gap: 12px; margin: 8px 0 0; }
 .legalLinks button { font: inherit; font-size: 11px; color: #0b4fd1; background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
 .legalLinks button:hover { color: var(--hood-accent); }
+@media (max-width: 640px) {
+  .legalLinks { flex-wrap: wrap; gap: 4px 16px; }
+  .legalLinks button { font-size: 13px; padding: 8px 0; }
+}
