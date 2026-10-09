@@ -11,7 +11,7 @@ import { latexErrors } from '@/components/xp/Latex';
 import { ApiError, scoreTheorem } from '@/lib/api';
 import { useIdentity } from '@/lib/identity';
 import { openApp } from '@/lib/openApp';
-import { launchErrorMessage, useCanLaunch, useLaunchTerms } from '@/lib/pons/launch';
+import { txErrorMessage, useCanLaunch, useLaunchTerms } from '@/lib/pons/launch';
 import { useWindows, type WindowState } from '@/store/windows';
 import { deployLaunch, type DeployResult, type DeployStep } from './deploy';
 import {
@@ -135,7 +135,7 @@ export function Launch({ win }: { win: WindowState }) {
       );
       setDeploy({ state: 'done', result });
     } catch (e) {
-      setDeploy({ state: 'error', message: e instanceof ApiError ? e.message : launchErrorMessage(e) });
+      setDeploy({ state: 'error', message: e instanceof ApiError ? e.message : txErrorMessage(e) });
     }
   };
 

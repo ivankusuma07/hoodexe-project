@@ -66,7 +66,7 @@ export function TokenDetail({ win }: { win: WindowState }) {
         </div>
       </div>
       <aside className={styles.side}>
-        <TradePanel token={t} />
+        <TradePanel token={t} paused={paused} />
       </aside>
     </div>
   );

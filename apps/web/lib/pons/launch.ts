@@ -77,13 +77,14 @@ const REVERT_MESSAGES: Record<string, string> = {
   LaunchConfigDisabled: 'Pons has paused new launches on this configuration.',
   InvalidLaunchConfigId: 'Pons has paused new launches on this configuration.',
   LaunchEconomicsMismatch: 'Pons changed its launch terms after you reviewed them. Go back and review the new terms.',
-  SlippageExceeded: 'The price moved past your slippage limit before the dev buy filled.',
+  SlippageExceeded: 'The price moved past your slippage limit. Try again or allow more slippage.',
+  CurveGraduated: 'This curve has finished: the coin is graduating to Uniswap V4.',
   InsufficientAllowance: 'The router is not approved to spend your dev buy.',
   ZeroAmount: 'The dev buy amount is zero.',
 };
 
 /** A sentence for the XP error dialog, from a wagmi/viem error or anything else thrown in the flow. */
-export function launchErrorMessage(e: unknown): string {
+export function txErrorMessage(e: unknown): string {
   if (e instanceof BaseError) {
     if (e.walk((x) => x instanceof UserRejectedRequestError)) return 'You cancelled the request in your wallet.';
     const revert = e.walk((x) => x instanceof ContractFunctionRevertedError);
@@ -92,7 +93,7 @@ export function launchErrorMessage(e: unknown): string {
       if (name && REVERT_MESSAGES[name]) return REVERT_MESSAGES[name];
       return `The launch would fail on-chain${name ? ` (${name})` : ''}.`;
     }
-    if (/insufficient funds/i.test(e.message)) return 'This wallet does not have enough ETH for the launch fee, dev buy and gas.';
+    if (/insufficient funds/i.test(e.message)) return 'This wallet does not have enough ETH for this transaction and its gas.';
     return e.shortMessage;
   }
   return e instanceof Error ? e.message : 'Something went wrong.';

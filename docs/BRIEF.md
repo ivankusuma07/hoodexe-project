@@ -438,6 +438,7 @@ Day 7: 50+ launches · Day 14: $10k+ volume · Day 30: 200+ wallets, 500+ callou
 - ~~Bix: RPC provider~~ — Alchemy (free tier) set for the API, 9 Oct 2026. It serves eth_call and archive state, but caps `eth_getLogs` at 10 blocks, so launches come from Envio. The public RPC answers busy Node clients with Cloudflare 403s.
 - ~~Dev: Envio indexer synced~~ — 9 Oct 2026, locally: `apps/indexer` indexes launches, curve trades, 1m/5m/1h/1d candles and graduations over HyperSync; `raisedQuote` matches each curve's on-chain `realQuoteReserve` to the wei. Explore lists real Pons tokens through it.
 - Bix — Envio hosted: an Envio account with the Envio Deployments GitHub app on this repo (root `apps/indexer`, `config.yaml`), and a plan; its GraphQL URL goes into Railway as `ENVIO_GRAPHQL_URL`. The free HyperSync token (5 requests/min) is for local development only.
+- Bix — Explore moderation: "All Pons" lists every Pons launch unfiltered (mainnet already has coins named after Hitler). Moderation in §10 covers callouts only. Decide whether Explore hides names, tickers or descriptions that hit the callout blocklist.
 - Dev: SIWE moved forward from week 3, since `/ipfs` needs a session; the wizard signs in before pinning. The DeepSeek "thinking off" switch is sent as `thinking: {type: "disabled"}` (third-party V4 docs). Confirm it against api-docs.deepseek.com once a key is in place.
 - Dev: `/ipfs` and `/launches` use the server's cached rigor score, never the client's, so a forged score can't reach IPFS or the launch record.
 
