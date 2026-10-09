@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+# Local development: same contracts, starting near the chain head so the free HyperSync token (5 requests/min) keeps up.
+name: hood-exe
+handlers: ./src/handlers
+contracts:
+  - name: PonsV2Factory
+    events:
+      - event: TokenLaunched(address indexed token, address indexed curve, address indexed deployer, address pairToken, uint256 launchConfigId, uint256 graduationThreshold)
+      - event: LaunchSwept(address indexed token, uint256 quoteOut, uint256 tokenOut)
+      - event: PoolGraduated(address indexed token, uint256 positionId, uint256 tokenAmount, uint256 pairTokenAmount)
+  # One per launch; registered from TokenLaunched, so it has no address here.
+  - name: PonsV2Curve
+    events:
+      - event: CurveBuy(address indexed buyer, address indexed recipient, uint256 quoteIn, uint256 tokensOut, uint256 fee, uint256 tax)
+        field_selection:
+          transaction_fields:
+            - hash
+      - event: CurveSell(address indexed seller, address indexed recipient, uint256 tokensIn, uint256 quoteOut, uint256 fee, uint256 tax)
+        field_selection:
+          transaction_fields:
+            - hash
+chains:
+  - id: 4663
+    # About an hour before this file was written; raise it, or use "latest", to start fresher.
+    start_block: 83990000
+    contracts:
+      - name: PonsV2Factory
+        address: "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"
+      - name: PonsV2Curve

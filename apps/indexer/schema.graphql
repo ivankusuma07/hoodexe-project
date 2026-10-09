@@ -1,0 +1,72 @@
+# Pons V2 launches and curve trades (docs/BRIEF.md §9 "Envio entities": Token, Trade, Candle, Graduation).
+# Amounts are raw integers in their own decimals: quote amounts in the pair token's, token amounts in 18.
+# Prices are quote-units per token-unit (raw ratio); the API converts with the pair's decimals.
+
+type Token {
+  id: ID!
+  curve: String! @index
+  deployer: String! @index
+  pairToken: String! @index
+  launchConfigId: BigInt!
+  graduationThreshold: BigInt!
+  launchBlock: Int! @index
+  launchedAt: Int!
+  "0 curve, 1 swept, 2 pool (getLaunchedToken().phase); 3 (rescued) is not evented."
+  phase: Int!
+  "Quote the curve holds from trades: Σ(buy spent − fee − tax) − Σ(sell quoteOut + fee + tax). Progress = raised / graduationThreshold."
+  raisedQuote: BigInt!
+  "Gross quote traded: buys' spent plus sells' quoteOut + fee + tax."
+  volumeQuote: BigInt!
+  trades: Int!
+  buys: Int!
+  sells: Int!
+  lastPrice: BigDecimal
+  lastTradeAt: Int
+}
+
+"Maps a curve back to its token for trade events."
+type Curve {
+  id: ID!
+  token: String!
+}
+
+type Trade {
+  id: ID!
+  token: String! @index
+  trader: String! @index
+  recipient: String!
+  isBuy: Boolean!
+  "Gross quote: what a buyer spent, or what a sale took off the curve before fees."
+  quoteAmount: BigInt!
+  tokenAmount: BigInt!
+  fee: BigInt!
+  tax: BigInt!
+  "Execution price before fees: net quote into (or gross out of) the curve per token."
+  price: BigDecimal!
+  blockNumber: Int! @index
+  timestamp: Int!
+  txHash: String!
+}
+
+"OHLC of trade prices per token and interval (60, 300, 3600, 86400 s)."
+type Candle {
+  id: ID!
+  token: String! @index
+  interval: Int!
+  bucketStart: Int! @index
+  open: BigDecimal!
+  high: BigDecimal!
+  low: BigDecimal!
+  close: BigDecimal!
+  volumeQuote: BigInt!
+  trades: Int!
+}
+
+type Graduation {
+  id: ID!
+  sweptAt: Int
+  sweptQuote: BigInt
+  sweptTokens: BigInt
+  poolAt: Int
+  positionId: BigInt
+}

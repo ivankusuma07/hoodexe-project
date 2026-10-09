@@ -1,0 +1,21 @@
+{
+  "name": "@hood/indexer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "codegen": "node scripts/envio.mjs codegen",
+    "test": "node scripts/envio.mjs test",
+    "typecheck": "node scripts/envio.mjs ensure-types && tsc --noEmit",
+    "lint": "node scripts/envio.mjs ensure-types && tsc --noEmit",
+    "start": "envio start"
+  },
+  "dependencies": {
+    "envio": "3.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.1",
+    "typescript": "^5",
+    "vitest": "5.0.3"
+  }
+}

@@ -1,7 +1,9 @@
-# Local Postgres + Redis for apps/api (Railway runs the same versions in staging/production).
+# Local Postgres + Redis for apps/api (Railway runs the same versions in staging/production), plus the
+# Envio indexer and its Hasura GraphQL behind the "indexer" profile.
 # Ports are offset so they don't clash with a locally installed Postgres or Redis.
 #
-#   docker compose up -d
+#   docker compose up -d                       # Postgres + Redis
+#   docker compose --profile indexer up -d     # + Envio indexer (config.dev.yaml) and Hasura on :8080
 name: hood-exe
 
 services:
@@ -15,6 +17,7 @@ services:
       - '127.0.0.1:54320:5432'
     volumes:
       - postgres:/var/lib/postgresql/data
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/10-envio.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U hood']
       interval: 2s
@@ -28,6 +31,52 @@ services:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 2s
       retries: 15
+
+  # GraphQL over the indexer's tables (what `envio dev` would start). Console: http://localhost:8080
+  hasura:
+    image: hasura/graphql-engine:v2.48.5
+    profiles: [indexer]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:8080:8080'
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://hood:hood@postgres:5432/envio
+      HASURA_GRAPHQL_ENABLE_CONSOLE: 'true'
+      HASURA_GRAPHQL_ADMIN_SECRET: testing
+      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: public
+      HASURA_GRAPHQL_NO_OF_RETRIES: '10'
+      # uint256 amounts would otherwise come back as JSON numbers and lose digits in JavaScript.
+      HASURA_GRAPHQL_STRINGIFY_NUMERIC_TYPES: 'true'
+
+  # envio has no Windows build, so the indexer always runs here locally. Envio's hosted service runs
+  # config.yaml in production. ENVIO_API_TOKEN comes from apps/indexer/.env.
+  indexer:
+    build:
+      context: ./apps/indexer
+      dockerfile: Dockerfile.dev
+    profiles: [indexer]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      hasura:
+        condition: service_started
+    env_file: ./apps/indexer/.env
+    environment:
+      ENVIO_CONFIG: config.dev.yaml
+      ENVIO_PG_HOST: postgres
+      ENVIO_PG_PORT: '5432'
+      ENVIO_PG_USER: hood
+      ENVIO_PG_PASSWORD: hood
+      ENVIO_PG_DATABASE: envio
+      HASURA_GRAPHQL_ENDPOINT: http://hasura:8080/v1/metadata
+      HASURA_GRAPHQL_ADMIN_SECRET: testing
+      ENVIO_TUI: 'false'
+    volumes:
+      - ./apps/indexer:/app
+      - /app/node_modules
+    command: ['npx', 'envio', 'start']
 
 volumes:
   postgres:
