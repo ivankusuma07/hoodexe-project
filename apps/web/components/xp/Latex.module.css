@@ -1,0 +1,9 @@
+.latex { font-family: var(--font-display); white-space: pre-wrap; overflow-wrap: anywhere; }
+.latex :global(.katex) { font-size: 1.05em; }
+.latex :global(.katex-display) { margin: 4px 0; overflow-x: auto; overflow-y: hidden; }
+.error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--bad);
+  text-decoration: underline wavy var(--bad);
+}

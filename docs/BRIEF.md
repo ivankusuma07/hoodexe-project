@@ -135,7 +135,7 @@ On open: `canLaunch(wallet)`; if false, XP dialog "Pons launches are invite-only
 | 3 Economics | Pair asset | ETH default; USDG, cbBTC, stock tokens from `approvedPairTokens` |
 | 3 Economics | Creator wallet | Defaults to connected wallet |
 | 3 Economics | Creator tax | 0 … `maxCreatorTaxBps()`, default 0 |
-| 3 Economics | Fee sharing | Creator (default) or holders pro-rata |
+| 3 Economics | Fee sharing | Creator (default) or holders pro-rata — *Pons has no holder split; the wizard offers buyback & lock instead (see §14 Still open)* |
 | 3 Economics | Dev buy | Optional, in pair asset |
 | 3 Economics | Socials | X, Telegram, website (prefilled `https://hood.fun`) |
 
@@ -433,6 +433,7 @@ Day 7: 50+ launches · Day 14: $10k+ volume · Day 30: 200+ wallets, 500+ callou
 - ~~Kickoff `canLaunch` check~~ — done 9 Oct 2026: `launchEnabled = true`, public launches are open (`pnpm --filter @hood/shared check:pons`).
 - Bix: domain + 10 accounts; reference preview / screenshots; RPC provider; confirm curve-selector + platform-fee removal; `OFFICIAL_WALLETS`; house tokens; lawyer review + geo-blocking; DeepSeek balance (USD 20); pricing + milestones; soft-launch plan.
 - ~~Dev: metadata caps~~ — done (§5.2). Pons: referral / interface-fee program.
+- Bix: "fee sharing → holders pro-rata" (§5.2) has no Pons equivalent. `buybackEnabled` is the only fee switch, and it is creator-funded buyback & lock vesting over 5 years, split with Pons. The wizard shows it as an opt-in checkbox (default off). Confirm or drop.
 
 ---
 

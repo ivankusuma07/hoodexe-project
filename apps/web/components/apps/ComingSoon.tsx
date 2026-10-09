@@ -8,16 +8,6 @@ import styles from './apps.module.css';
 
 /** Setup-style placeholder for programs that land in later build weeks (docs/BRIEF.md §14). */
 const PLANNED: Partial<Record<AppId, { week: number; progress: number; features: string[] }>> = {
-  launch: {
-    week: 2,
-    progress: 20,
-    features: [
-      'Three-page wizard: identity, theorem, economics',
-      'Live LaTeX preview and AI rigor score',
-      'Pair asset, creator tax, dev buy',
-      'Launches straight to Pons V2 from your wallet',
-    ],
-  },
   explore: {
     week: 2,
     progress: 25,
