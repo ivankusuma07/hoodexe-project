@@ -34,6 +34,22 @@ export type CurveState = {
   creatorTaxBps: bigint;
 };
 
+/**
+ * A curve as PonsV2BondingCurve.initialize leaves it: the whole supply on the token side, the phantom
+ * reserve on the quote side, and `supply × phantom / (phantom + threshold)` held back to seed the pool.
+ * Quotes a dev buy before the launch exists.
+ */
+export function freshCurveState(
+  supply: bigint,
+  phantomQuote: bigint,
+  graduationThreshold: bigint,
+  feeBps: bigint,
+  creatorTaxBps: bigint,
+): CurveState {
+  const reserved = (supply * phantomQuote) / (phantomQuote + graduationThreshold);
+  return { quoteReserve: phantomQuote, tokenReserve: supply, sellable: supply - reserved, feeBps, creatorTaxBps };
+}
+
 export type BuyQuote = {
   tokensOut: bigint;
   /** Quote actually spent; less than the input when the last buy before graduation is clamped. */

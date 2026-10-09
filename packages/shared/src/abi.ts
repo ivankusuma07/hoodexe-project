@@ -220,6 +220,9 @@ export const ponsRouterAbi = [
       { name: 'tokensOut', type: 'uint256' },
     ],
   },
+  // Not in the published source; selectors decoded from eth_call reverts on 4663.
+  { type: 'error', name: 'ZeroAmount', inputs: [] },
+  { type: 'error', name: 'InsufficientAllowance', inputs: [] },
 ] as const;
 
 export const ponsCurveAbi = [

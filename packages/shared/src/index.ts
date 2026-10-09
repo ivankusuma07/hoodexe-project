@@ -4,6 +4,7 @@ export * from './abi';
 export * from './quote';
 export * from './rigor';
 export * from './launch';
+export * from './launchTx';
 export * from './pairs';
 export * from './latex';
 export * from './format';

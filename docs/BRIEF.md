@@ -231,6 +231,7 @@ No Pons API: we call contracts with viem and index the factory ourselves. V1 tok
 - Graduation inside the finishing buy → full-range Uniswap V4 pool (fee 0, tick spacing 200, PonsV2MemeHook), liquidity locked forever. Last pre-graduation buy is clamped and refunded; `minTokensOut` bounds price not quantity.
 - Phase from `getLaunchedToken().phase` (0 curve / 1 swept / 2 pool / 3 rescued), never from balances.
 - ERC-20 pairs need approvals (curve for buys, router for `launchAndBuy`).
+- Launch tx (verified by eth_call, `pnpm --filter @hood/shared simulate:launch`): no dev buy → `factory.launchToken`, value = `launchFee` (router reverts `ZeroAmount` on 0); dev buy → `router.launchAndBuy`, value = `launchFee + quoteIn` for ETH, `launchFee` for ERC-20 after approving the router. The creator is snipe-tax exempt, so the dev buy fills at the untaxed price. A dev buy over ~4.3 ETH graduates the coin inside the launch tx.
 - No quote function: port the quote math from the docs. **V2 is unaudited** — say so in the risk dialog.
 
 | Contract (chain 4663) | Address |
