@@ -23,6 +23,7 @@ import { ipfsRoutes } from './routes/ipfs';
 import { launchRoutes } from './routes/launches';
 import { liveRoutes } from './routes/live';
 import { portfolioRoutes } from './routes/portfolio';
+import { rpcRoutes } from './routes/rpc';
 import { scoreRoutes } from './routes/score';
 import { tokenRoutes } from './routes/tokens';
 
@@ -165,5 +166,6 @@ export async function buildApp(deps: Deps) {
   await app.register(calloutRoutes);
   await app.register(liveRoutes);
   await app.register(portfolioRoutes);
+  await app.register(rpcRoutes);
   return app;
 }

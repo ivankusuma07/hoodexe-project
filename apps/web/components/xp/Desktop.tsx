@@ -34,11 +34,12 @@ export function Desktop() {
   const [startOpen, setStartOpen] = useState(false);
   const [overlay, setOverlay] = useState<Overlay>(null);
 
-  // First load: open the app named in ?app=, else Welcome.
+  // First load: open the coin in /t/0x… or the app named in ?app=, else Welcome.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const requested = params.get('app');
-    const token = params.get('t');
+    const shared = /^\/t\/(0x[0-9a-fA-F]{40})\/?$/.exec(window.location.pathname)?.[1];
+    const requested = shared ? 'token' : params.get('app');
+    const token = shared ?? params.get('t');
     if (useWindows.getState().windows.length > 0) return;
     if (requested === 'token' && token && isAddress(token, { strict: false })) openToken(token);
     else openApp(isAppId(requested) && requested !== 'token' ? requested : 'welcome');
@@ -51,7 +52,7 @@ export function Desktop() {
       !active || active.appId === 'welcome'
         ? '/'
         : active.appId === 'token' && active.props?.address
-          ? `/?app=token&t=${active.props.address}`
+          ? `/t/${active.props.address}`
           : `/?app=${active.appId}`;
     if (window.location.pathname + window.location.search !== next) window.history.replaceState(null, '', next);
   }, [windows, activeId]);

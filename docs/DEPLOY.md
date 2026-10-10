@@ -109,13 +109,22 @@ docker run --env-file apps/api/.env -e NODE_ENV=production -p 8787:8787 hood-api
    NEXT_PUBLIC_API_URL=/api
    API_PROXY_TARGET=https://<service>.up.railway.app      # read by apps/web/proxy.ts
    NEXT_PUBLIC_WS_URL=wss://<service>.up.railway.app/ws
-   NEXT_PUBLIC_RPC_URL=https://robinhood-mainnet.g.alchemy.com/v2/<browser key, restricted to the web app's domain>
+   NEXT_PUBLIC_RPC_URL=/api/rpc                            # the API forwards reads to RPC_URL_SERVER; no key in browsers
    NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
    NEXT_PUBLIC_PINATA_GATEWAY=https://<gateway>.mypinata.cloud
    ```
 
-   Never set `NEXT_PUBLIC_DEV_WALLET` here. `NEXT_PUBLIC_*` values ship to every browser, so never reuse the
-   server's RPC key. PostHog isn't wired in yet, so its variables do nothing for now.
+   Never set `NEXT_PUBLIC_DEV_WALLET` here. `NEXT_PUBLIC_*` values ship to every browser, so never put the
+   server's RPC key in one. The API's `/rpc` only allows read methods, about 600 calls a minute per visitor;
+   wallets still send transactions through their own RPC. All browser reads now count against the server's
+   Alchemy plan.
+
+   ```bash
+   NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=                   # Reown, project type "App"
+   NEXT_PUBLIC_POSTHOG_KEY=phc_…                           # public; add with --type config
+   NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+   NEXT_PUBLIC_SITE_URL=                                   # once there's a domain; link previews use it
+   ```
 4. Optional: Domains → `hood.fun`. Then add `https://hood.fun` to the API's `CORS_ORIGINS`.
 
 ## 4. Smoke test (before the first real launch)

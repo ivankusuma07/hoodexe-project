@@ -25,7 +25,9 @@ The worker (`apps/api/src/worker.ts`) ships in the API image as a second Railway
 - **Token Detail**: candle chart (1m–1d), last trades, graduation progress, and curve buy/sell with approvals, slippage and snipe-tax handling. Graduated coins link out to Pons.
 - **Callouts.exe**: live feed with reactions and nicknames; tray balloons when it is closed.
 - **Portfolio**: holdings marked at the curve price with unrealized P&L (average cost from indexed trades), sort by Rigor, Value or P&L %, Export CSV; "My launches" tab. Rows open Token Detail.
-- Still placeholders: legal windows.
+- **Share links**: `/t/0x…` opens the desktop on that coin, with its own link-preview card. Token Detail has Copy link and Post on X.
+- **Legal**: one-time risk dialog before the first launch or trade; Terms, Risk and Privacy windows (drafts pending legal review).
+- **Analytics**: PostHog, anonymous and cookieless, with the launch and trade funnels (`apps/web/lib/analytics.ts`).
 
 ## Develop
 

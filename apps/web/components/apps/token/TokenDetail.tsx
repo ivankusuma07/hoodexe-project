@@ -89,6 +89,33 @@ function Header({ token: t }: { token: Token }) {
           <dd>{formatQuote(t.volume24h, t.pair.symbol)}</dd>
         </div>
       </dl>
+      <Share token={t} />
+    </div>
+  );
+}
+
+/** Copy the /t/0x… link (its preview shows this coin's card) or post it on X. */
+function Share({ token: t }: { token: Token }) {
+  const [copied, setCopied] = useState(false);
+  const link = typeof window === 'undefined' ? '' : `${window.location.origin}/t/${t.token}`;
+  const text = t.hood && t.rigorScore != null ? `${t.symbol}: a theorem coin on hood.exe, rigor ${t.rigorScore}/100` : `${t.symbol} on hood.exe`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2_000);
+    } catch {
+      window.prompt('Copy this link:', link);
+    }
+  };
+  return (
+    <div className={styles.share}>
+      <button type="button" className={styles.shareBtn} onClick={() => void copy()}>
+        {copied ? 'Copied ✓' : 'Copy link'}
+      </button>
+      <a className={styles.shareBtn} href={`https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`} target="_blank" rel="noopener noreferrer">
+        Post on X
+      </a>
     </div>
   );
 }
