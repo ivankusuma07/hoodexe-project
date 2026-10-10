@@ -1,3 +1,7 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { describe, it } from 'vitest';
 import { BigDecimal, createTestIndexer } from 'envio';
 
@@ -8,6 +12,18 @@ const CURVE = '0x00000000000000000000000000000000000000C1';
 const DEPLOYER = '0x00000000000000000000000000000000000000D1';
 const TRADER = '0x00000000000000000000000000000000000000E1';
 const ETH = '0x0000000000000000000000000000000000000000';
+
+// A coin launched before the start block, known only from the seed file (seeds/pre-start-launches.csv.gz).
+const OLD_TOKEN = '0x00000000000000000000000000000000000000B1';
+const OLD_CURVE = '0x00000000000000000000000000000000000000C2';
+const seedFile = join(mkdtempSync(join(tmpdir(), 'hood-seed-')), 'seed.csv.gz');
+writeFileSync(
+  seedFile,
+  gzipSync(`token,curve,deployer,pairToken,launchConfigId,graduationThreshold,launchBlock,launchedAt
+${OLD_TOKEN},${OLD_CURVE},${DEPLOYER},${ETH},0,4200000000000000000,30000000,1786000000
+`),
+);
+process.env.HOOD_LAUNCH_SEED = seedFile;
 
 /** After both configs' start blocks, or the indexer drops the events. */
 const B = 84_000_000;
@@ -105,6 +121,15 @@ describe('Pons V2 handlers', () => {
 
     await indexer.process({ chains: { [CHAIN]: { simulate: [sell(4, T0 + 8, 2_000n * E18, E18, 0n, 0n)] } } });
     t.expect(await indexer.Position.get(`${TRADER}-${TOKEN}`)).toBeUndefined();
+  });
+
+  it('records trades on coins launched before the start block from the seed file', async (t) => {
+    const indexer = createTestIndexer();
+    const oldBuy = { ...buy(1, T0 + 5, E18, 1_000n * E18, 0n, 0n), srcAddress: OLD_CURVE };
+    await indexer.process({ chains: { [CHAIN]: { simulate: [oldBuy] } } });
+    t.expect(await indexer.Curve.getOrThrow(OLD_CURVE)).toMatchObject({ token: OLD_TOKEN });
+    t.expect(await indexer.Token.getOrThrow(OLD_TOKEN)).toMatchObject({ curve: OLD_CURVE, deployer: DEPLOYER, launchBlock: 30_000_000, trades: 1, buys: 1 });
+    t.expect(await indexer.Position.getOrThrow(`${TRADER}-${OLD_TOKEN}`)).toMatchObject({ qty: 1_000n * E18, cost: E18 });
   });
 
   it('builds 1m/5m/1h/1d candles with OHLC and volume', async (t) => {

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import { BigDecimal, indexer, type EvmOnEventContext } from 'envio';
 
 /** Candle intervals in seconds: 1m, 5m, 1h, 1d (docs/BRIEF.md §9). */
@@ -26,6 +29,57 @@ indexer.onEvent({ contract: 'PonsV2Factory', event: 'TokenLaunched' }, async ({ 
   context.Curve.set({ id: curve, token });
 });
 
+/**
+ * Coins launched before the start block (config.selfhost.yaml starts on 3 Oct 2026) never had their
+ * TokenLaunched handled, so their curves are unknown. seeds/pre-start-launches.csv.gz lists those launches
+ * (exported from a full index; graduated coins left out), and a trade from one of their curves records the
+ * launch first. Those coins' raisedQuote/volume counters start from zero at that point.
+ */
+let seeds: Map<string, string[]> | null = null;
+function seededLaunch(curve: string): string[] | undefined {
+  if (!seeds) {
+    seeds = new Map();
+    try {
+      const file = process.env.HOOD_LAUNCH_SEED ?? join(process.cwd(), 'seeds', 'pre-start-launches.csv.gz');
+      const lines = gunzipSync(readFileSync(file)).toString('utf8').split('\n').slice(1);
+      for (const line of lines) {
+        const f = line.split(',');
+        if (f.length === 8) seeds.set(f[1].toLowerCase(), f);
+      }
+    } catch {
+      // No seed file (e.g. config.yaml, which indexes every launch): nothing to add.
+    }
+  }
+  return seeds.get(curve.toLowerCase());
+}
+
+function seedCurve(curveAddress: string, context: EvmOnEventContext): { id: string; token: string } | undefined {
+  const f = seededLaunch(curveAddress);
+  if (!f) return undefined;
+  const [token, , deployer, pairToken, launchConfigId, graduationThreshold, launchBlock, launchedAt] = f;
+  const curve = { id: curveAddress, token };
+  context.Curve.set(curve);
+  context.Token.set({
+    id: token,
+    curve: curveAddress,
+    deployer,
+    pairToken,
+    launchConfigId: BigInt(launchConfigId),
+    graduationThreshold: BigInt(graduationThreshold),
+    launchBlock: Number(launchBlock),
+    launchedAt: Number(launchedAt),
+    phase: 0,
+    raisedQuote: 0n,
+    volumeQuote: 0n,
+    trades: 0,
+    buys: 0,
+    sells: 0,
+    lastPrice: undefined,
+    lastTradeAt: undefined,
+  });
+  return curve;
+}
+
 type TradeInput = {
   isBuy: boolean;
   trader: string;
@@ -49,8 +103,9 @@ type TradeEvent = { srcAddress: string; logIndex: number; block: { number: numbe
  * quoteOut + fee + tax. Prices are taken at the curve, before fees.
  */
 async function recordTrade(event: TradeEvent, context: EvmOnEventContext, t: TradeInput) {
-  const curve = await context.Curve.get(event.srcAddress);
-  if (!curve || t.tokens === 0n) return;
+  if (t.tokens === 0n) return;
+  const curve = (await context.Curve.get(event.srcAddress)) ?? seedCurve(event.srcAddress, context);
+  if (!curve) return;
   const token = await context.Token.get(curve.token);
   if (!token) return;
 
