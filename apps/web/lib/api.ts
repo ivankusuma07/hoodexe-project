@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import { rigorScoreSchema, type RigorScore, type TheoremMetadata } from '@hood/shared';
 
-/** Typed client for apps/api (docs/BRIEF.md §9). Cookies ride along for the SIWE session. */
+/**
+ * Typed client for apps/api (docs/BRIEF.md §9). Cookies ride along for the SIWE session. NEXT_PUBLIC_API_URL
+ * is either the API's own URL (local dev) or `/api`, proxied to it by next.config.ts (production).
+ */
 const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ?? '';
 
 export class ApiError extends Error {
@@ -249,11 +252,11 @@ export const liveMessageSchema = z.discriminatedUnion('type', [
 ]);
 export type LiveMessage = z.infer<typeof liveMessageSchema>;
 
-/** The WebSocket URL: NEXT_PUBLIC_WS_URL, else the API URL with ws(s) and /ws. */
+/** The WebSocket URL: NEXT_PUBLIC_WS_URL, else the API URL with ws(s) and /ws (not through the /api proxy). */
 export function liveUrl(): string | null {
   const explicit = process.env.NEXT_PUBLIC_WS_URL;
   if (explicit) return explicit;
-  if (!API_URL) return null;
+  if (!API_URL.startsWith('http')) return null;
   return `${API_URL.replace(/^http/, 'ws')}/ws`;
 }
 

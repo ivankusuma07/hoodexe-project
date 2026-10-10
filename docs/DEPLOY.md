@@ -1,23 +1,26 @@
 # Deploying hood.exe
 
-Plan (agreed 9 Oct 2026): deploy the real production setup about a week early, on its final domains, and use
+Plan (agreed 9 Oct 2026): deploy the real production setup about a week early and use
 it unannounced for the house tokens and one real launch and trade. On launch day nothing is redeployed; the
 link is announced. Staging and mainnet are the same chain (4663) and the same Pons contracts, so there is no
 separate staging network to maintain.
 
 ```
-hood.fun (Vercel, apps/web) ──HTTPS + cookie──▶ api.hood.fun (Railway: api) ──▶ Postgres, Redis (Railway)
-                             ◀──── /ws ───────                ▲                    ▲
-                                                Railway: worker ┘── Redis pub/sub ──┘
-                     api + worker ──GraphQL──▶ Envio hosted (apps/indexer)
-                     api ──eth_call──▶ Alchemy (RPC_URL_SERVER)
+browser ──/api/* + cookie──▶ web (Vercel) ──rewrite──▶ api (Railway, *.up.railway.app) ──▶ Postgres, Redis
+   └────────── wss://…/ws (live feed, direct) ─────────▶        ▲                              ▲
+                                                 worker (Railway) ┘──── Redis pub/sub ─────────┘
+                            api + worker ──GraphQL──▶ Envio hosted (apps/indexer)
+                            api ──eth_call──▶ Alchemy (RPC_URL_SERVER)
 ```
+
+The API has no custom domain. The web app serves it at `/api/*` on its own host (a Next.js rewrite to the Railway
+URL), so the browser only ever talks to the web app's site.
 
 ## Before you start: what Bix provides
 
 | What | Used for |
 | --- | --- |
-| Domain (`hood.fun` in the brief) with DNS access | Web on the apex, API on `api.` |
+| Optional: a domain (`hood.fun` in the brief) | The web app. Without one it runs on `hood-exe.vercel.app`. The API needs none. |
 | Vercel | `apps/web`. The repo is already linked to a Vercel project named `hood-exe`. |
 | Railway | API, worker, Postgres, Redis |
 | Envio account + the Envio Deployments GitHub app on this repo | Hosted indexer |
@@ -27,14 +30,18 @@ hood.fun (Vercel, apps/web) ──HTTPS + cookie──▶ api.hood.fun (Railway:
 | Reown (WalletConnect) project id | WalletConnect and mobile wallets in the connect dialog |
 | `OFFICIAL_WALLETS` | Wallets shown as official in Callouts |
 
-## Why the web and the API must share a domain
+## Why the API goes through the web app
 
-Sign-in sets an httpOnly session cookie with `SameSite=Lax` on `COOKIE_DOMAIN=.hood.fun`. Browsers only send it
-on the web app's API calls when both are on the same site (`hood.fun` and `api.hood.fun`). On the default
-`*.vercel.app` and `*.up.railway.app` hosts, signing in silently fails: Launch, Callouts and reactions break.
+Sign-in sets an httpOnly session cookie. If the browser called the Railway URL directly, that cookie would be
+cross-site (`*.vercel.app` vs `*.up.railway.app`). Safari blocks such cookies and other browsers increasingly do,
+so signing in would silently fail and Launch, Callouts and reactions would break. Through the `/api` rewrite
+the cookie belongs to the web app's own host, so leave `COOKIE_DOMAIN` empty.
 
-Sign-in also only accepts messages for hosts in the API's `CORS_ORIGINS`. Vercel preview deployments can
-browse, but can't sign in unless their host is added there and shares the cookie domain.
+The live feed is the exception: Vercel rewrites can't carry WebSockets, so the browser opens `/ws` on the
+Railway URL directly. It needs no cookie, and the API only accepts origins listed in `CORS_ORIGINS`.
+
+Sign-in only accepts messages naming a host in `CORS_ORIGINS`. Vercel preview deployments can browse but can't
+sign in unless their host is added there.
 
 ## 1. Indexer: Envio hosted
 
@@ -54,7 +61,7 @@ browse, but can't sign in unless their host is added there and shares the cookie
    - Settings → Config file path: `apps/api/railway.json` (Dockerfile build, `/health` check, restart on failure).
    - One replica. The API also keeps Explore's token table in sync in-process. If it ever runs more than one
      replica, set `TOKEN_INDEX=off` on all but one.
-   - Networking → custom domain `api.hood.fun`.
+   - Networking → Generate Domain. Note the `https://<service>.up.railway.app` URL; the web app proxies to it.
 3. **worker** service, same repo, config file path `apps/api/railway.worker.json`. It posts system callouts and
    has no public port.
 4. Variables. Put these in Railway's shared variables so both services get them:
@@ -68,8 +75,8 @@ browse, but can't sign in unless their host is added there and shares the cookie
    DEEPSEEK_API_KEY=
    PINATA_JWT=
    SESSION_SECRET=<openssl rand -hex 32>
-   COOKIE_DOMAIN=.hood.fun
-   CORS_ORIGINS=https://hood.fun,https://www.hood.fun
+   COOKIE_DOMAIN=                            # empty: the cookie belongs to the web app's host
+   CORS_ORIGINS=https://hood-exe.vercel.app  # every origin the web app is served from, comma-separated
    OFFICIAL_WALLETS=0x…,0x…
    BLOCKLIST_EXTRA=
    ```
@@ -93,20 +100,24 @@ docker run --env-file apps/api/.env -e NODE_ENV=production -p 8787:8787 hood-api
 3. Production environment variables:
 
    ```bash
-   NEXT_PUBLIC_API_URL=https://api.hood.fun
-   NEXT_PUBLIC_WS_URL=wss://api.hood.fun/ws
-   NEXT_PUBLIC_RPC_URL=https://robinhood-mainnet.g.alchemy.com/v2/<browser key, restricted to hood.fun>
+   NEXT_PUBLIC_API_URL=/api
+   API_PROXY_TARGET=https://<service>.up.railway.app      # read at build time by next.config.ts
+   NEXT_PUBLIC_WS_URL=wss://<service>.up.railway.app/ws
+   NEXT_PUBLIC_RPC_URL=https://robinhood-mainnet.g.alchemy.com/v2/<browser key, restricted to the web app's domain>
    NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
    NEXT_PUBLIC_PINATA_GATEWAY=https://<gateway>.mypinata.cloud
    ```
 
    Never set `NEXT_PUBLIC_DEV_WALLET` here. `NEXT_PUBLIC_*` values ship to every browser, so never reuse the
    server's RPC key. PostHog isn't wired in yet, so its variables do nothing for now.
-4. Domains → `hood.fun` (and `www.hood.fun` redirecting to it).
+4. Optional: Domains → `hood.fun`. Then add `https://hood.fun` to the API's `CORS_ORIGINS`.
 
 ## 4. Smoke test (before the first real launch)
 
-- [ ] `https://api.hood.fun/health` answers `{"ok":true,"db":true,"kv":true}`.
+- [ ] `https://<web app>/api/health` answers `{"ok":true,"db":true,"kv":true}` (the proxy and the API both work).
+- [ ] Railway → api → logs: requests from two different networks (e.g. Wi-Fi and a phone on mobile data) show
+      two different `remoteAddress` values. If every request shows the same few Vercel addresses, the per-IP
+      rate limits are shared by everyone: stop and fix that before launch.
 - [ ] Explore lists recent Pons coins (indexer + RPC), and Token Detail shows a chart and trades.
 - [ ] Callouts header shows LIVE. With two browsers open, a callout posted in one appears in the other within
       a second (Redis pub/sub + `/ws`).
@@ -123,6 +134,14 @@ docker run --env-file apps/api/.env -e NODE_ENV=production -p 8787:8787 hood-api
 
 Railway → service → Deployments → redeploy the previous build. Vercel → Deployments → Instant Rollback.
 Migrations only add tables and columns, so the previous API build runs against the newer schema.
+
+## Known gap: rate limits by IP
+
+Sign-in, scoring and posting are rate-limited per client IP, read from `X-Forwarded-For`. Through the proxy that
+header must carry the visitor's address. If it carried Vercel's instead, every visitor would share one limit
+(scoring allows 10 statements an hour per IP). The smoke test checks this. Separately, the Railway URL is public, so someone calling it directly can forge that header and get
+around the per-IP limits. The per-wallet limits still apply. Closing this means the web app signing its proxied
+requests with a shared secret. Worth doing if scoring costs or spam become a problem.
 
 ## Still open before mainnet
 

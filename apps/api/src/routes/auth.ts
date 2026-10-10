@@ -21,7 +21,7 @@ const verifyBody = z.object({
 /** SIWE (docs/BRIEF.md §10): 10-minute nonce, 7-day httpOnly session cookie on chain 4663. */
 export async function authRoutes(app: FastifyInstance) {
   const { db, kv, chain, env } = app.deps;
-  // The SIWE domain must be a site we serve the app from, e.g. hood.fun or staging.hood.fun.
+  // The SIWE domain must be a site we serve the app from (a CORS_ORIGINS host).
   const domains = new Set(env.CORS_ORIGINS.map((o) => new URL(o).host));
   const cookieOptions = {
     signed: true,
