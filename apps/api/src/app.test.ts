@@ -253,6 +253,24 @@ describe('memoryKv', () => {
   });
 });
 
+describe('client IP for rate limits', () => {
+  const nonce = (headers: Record<string, string> = {}) => ctx.app.inject({ method: 'GET', url: '/auth/siwe', headers }).then((r) => r.statusCode);
+  const via = (ip: string, secret = 'proxy-secret-for-tests') => ({ 'x-hood-proxy-secret': secret, 'x-hood-client-ip': ip });
+
+  it('believes the forwarded IP only with the proxy secret', async () => {
+    await ctx.close();
+    ctx = await setup({ env: { PROXY_SECRET: 'proxy-secret-for-tests' } });
+    // Sign-in nonces: 30 per IP per 10 minutes.
+    for (let i = 0; i < 30; i++) expect(await nonce(via('203.0.113.7'))).toBe(200);
+    expect(await nonce(via('203.0.113.7'))).toBe(429);
+    expect(await nonce(via('198.51.100.9'))).toBe(200); // another visitor behind the same proxy
+
+    // A wrong secret or none: the header is ignored and the connection's own address counts.
+    for (let i = 0; i < 30; i++) expect(await nonce(via(`192.0.2.${i}`, 'guess'))).toBe(200);
+    expect(await nonce({ 'x-hood-client-ip': '192.0.2.200' })).toBe(429);
+  });
+});
+
 describe('loadEnv', () => {
   it('treats empty variables as unset', () => {
     const env = loadEnv({ DATABASE_URL: 'postgres://x', SESSION_SECRET: '', CORS_ORIGINS: ' ', REDIS_URL: '' });

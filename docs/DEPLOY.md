@@ -121,9 +121,9 @@ docker run --env-file apps/api/.env -e NODE_ENV=production -p 8787:8787 hood-api
 ## 4. Smoke test (before the first real launch)
 
 - [ ] `https://<web app>/api/health` answers `{"ok":true,"db":true,"kv":true}` (the proxy and the API both work).
-- [ ] Railway → api → logs: requests from two different networks (e.g. Wi-Fi and a phone on mobile data) show
-      two different `remoteAddress` values. If every request shows the same few Vercel addresses, the per-IP
-      rate limits are shared by everyone: stop and fix that before launch.
+- [ ] The visitor's IP gets through: request `https://<web app>/api/auth/siwe` 31 times (the sign-in limit is 30
+      per IP per 10 minutes) so the last answers 429. Then request `https://<railway api>/auth/siwe` directly from
+      the same network: it must also answer 429, which shows the proxy counted your address and not Vercel's.
 - [ ] Explore lists recent Pons coins (indexer + RPC), and Token Detail shows a chart and trades.
 - [ ] Callouts header shows LIVE. With two browsers open, a callout posted in one appears in the other within
       a second (Redis pub/sub + `/ws`).
@@ -141,13 +141,13 @@ docker run --env-file apps/api/.env -e NODE_ENV=production -p 8787:8787 hood-api
 Railway → service → Deployments → redeploy the previous build. Vercel → Deployments → Instant Rollback.
 Migrations only add tables and columns, so the previous API build runs against the newer schema.
 
-## Known gap: rate limits by IP
+## Rate limits and the visitor's IP
 
-Sign-in, scoring and posting are rate-limited per client IP, read from `X-Forwarded-For`. Through the proxy that
-header must carry the visitor's address. If it carried Vercel's instead, every visitor would share one limit
-(scoring allows 10 statements an hour per IP). The smoke test checks this. Separately, the Railway URL is public, so someone calling it directly can forge that header and get
-around the per-IP limits. The per-wallet limits still apply. Closing this means the web app signing its proxied
-requests with a shared secret. Worth doing if scoring costs or spam become a problem.
+Sign-in, scoring and posting are rate-limited per visitor IP. Through the `/api` rewrite the API only sees Vercel's
+addresses (checked on 10 Oct 2026), so the web app's `proxy.ts` forwards the visitor's IP in `x-hood-client-ip`
+along with `PROXY_SECRET`. The API believes that header only when the secret matches. Otherwise it uses the
+address Railway's proxy saw, which callers can't forge. Set the same random `PROXY_SECRET` on the Railway api
+service and on Vercel (server-side, never `NEXT_PUBLIC_`). Without it, every visitor shares one set of per-IP limits.
 
 ## Still open before mainnet
 

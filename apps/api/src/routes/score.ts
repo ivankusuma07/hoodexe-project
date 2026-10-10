@@ -45,7 +45,7 @@ export async function scoreRoutes(app: FastifyInstance) {
     // Cache hits are free; only model calls count against the IP limit (§10: 10/hour).
     const cached = await storedScore(db, normalized);
     if (cached && cached.createdAt.getTime() > cutoff) return toRigorScore(cached, true);
-    if (!(await allow(kv, `score:${req.ip}`, 10, 3_600))) throw new HttpError(429, 'Rigor scoring is limited to 10 statements an hour.');
+    if (!(await allow(kv, `score:${req.clientIp}`, 10, 3_600))) throw new HttpError(429, 'Rigor scoring is limited to 10 statements an hour.');
 
     const result = await scorer.score(name, normalized);
     if (!result) return { score: null, parts: null, statusLabel: null, reasoning: '', model: null, cached: false };

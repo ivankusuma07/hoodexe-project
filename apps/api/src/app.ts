@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
@@ -53,6 +55,8 @@ declare module 'fastify' {
   }
   interface FastifyRequest {
     wallet: Address | null;
+    /** The visitor's IP for rate limits: from the web app's signed proxy header, else the address Railway saw. */
+    clientIp: string;
   }
 }
 
@@ -70,13 +74,27 @@ export async function buildApp(deps: Deps) {
   const { env } = deps;
   const app = Fastify({
     logger: env.NODE_ENV === 'test' ? false : { level: env.NODE_ENV === 'production' ? 'info' : 'debug' },
-    // Railway terminates TLS in front of us; client IPs (rate limits) come from X-Forwarded-For.
-    trustProxy: env.NODE_ENV === 'production',
+    // Railway's proxy is the one hop in front of us: req.ip is the address it saw, which callers can't forge
+    // (a client-sent X-Forwarded-For only adds entries further left).
+    trustProxy: env.NODE_ENV === 'production' ? (_address: string, hop: number) => hop === 0 : false,
     bodyLimit: 64 * 1024,
   });
 
   app.decorate('deps', { ...deps, now: deps.now ?? (() => new Date()) });
   app.decorateRequest('wallet', null);
+  app.decorateRequest('clientIp', '');
+
+  // Requests through the web app's /api proxy arrive from Vercel's addresses; its proxy.ts forwards the
+  // visitor's IP with the shared PROXY_SECRET, and only then is that header believed.
+  const proxySecret = env.PROXY_SECRET ? Buffer.from(env.PROXY_SECRET) : null;
+  app.addHook('onRequest', async (req) => {
+    req.clientIp = req.ip;
+    const sent = req.headers['x-hood-proxy-secret'];
+    const forwarded = req.headers['x-hood-client-ip'];
+    if (!proxySecret || typeof sent !== 'string' || typeof forwarded !== 'string') return;
+    const given = Buffer.from(sent);
+    if (given.length === proxySecret.length && timingSafeEqual(given, proxySecret) && isIP(forwarded)) req.clientIp = forwarded;
+  });
 
   // The default allows GET/HEAD/POST only; PUT /profile needs its preflight to pass too.
   await app.register(cors, { origin: env.CORS_ORIGINS, credentials: true, methods: ['GET', 'HEAD', 'POST', 'PUT'] });

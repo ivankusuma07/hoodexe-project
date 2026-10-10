@@ -79,7 +79,7 @@ export async function calloutRoutes(app: FastifyInstance) {
 
     // §10 limits: 5/min and 60/day per wallet, 20/min per IP.
     const limited =
-      !(await allow(kv, `callout:ip:${req.ip}`, 20, 60)) ||
+      !(await allow(kv, `callout:ip:${req.clientIp}`, 20, 60)) ||
       !(await allow(kv, `callout:w:${wallet}:m`, 5, 60)) ||
       !(await allow(kv, `callout:w:${wallet}:d`, 60, 86_400));
     if (limited) throw new HttpError(429, 'Slow down: up to 5 callouts a minute and 60 a day.');

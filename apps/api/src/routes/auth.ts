@@ -33,7 +33,7 @@ export async function authRoutes(app: FastifyInstance) {
   };
 
   app.get('/auth/siwe', async (req) => {
-    if (!(await allow(kv, `siwe:${req.ip}`, 30, 600))) throw new HttpError(429, 'Too many sign-in attempts. Wait a few minutes.');
+    if (!(await allow(kv, `siwe:${req.clientIp}`, 30, 600))) throw new HttpError(429, 'Too many sign-in attempts. Wait a few minutes.');
     const nonce = generateSiweNonce();
     await kv.set(`siwe:nonce:${nonce}`, '1', NONCE_TTL);
     return { nonce };

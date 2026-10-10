@@ -46,6 +46,8 @@ const envSchema = z
      * unscored, callouts get the blocklist only, and /ipfs refuses, which blocks launches before any transaction.
      */
     STAND_INS: z.enum(['refuse', 'allow']).default('refuse'),
+    /** Shared with the web app (its PROXY_SECRET): proves an x-hood-client-ip header came through its /api proxy. */
+    PROXY_SECRET: optional,
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;
