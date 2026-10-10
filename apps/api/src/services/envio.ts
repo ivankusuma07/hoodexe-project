@@ -45,14 +45,48 @@ const tradeRow = z.object({
 });
 export type EnvioTrade = z.output<typeof tradeRow>;
 
-export function envioClient(graphqlUrl: string, pageSize = 1_000) {
-  async function query<T>(text: string, variables: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
-    const res = await fetch(graphqlUrl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ query: text, variables }),
-      signal: AbortSignal.timeout(15_000),
+/**
+ * Spaces requests so at most `perMinute` start in any 60 s window. Envio's hosted plans cap queries per minute
+ * (100 on the free plan) across everything that uses the endpoint, so the API and the worker each get a share.
+ */
+export function minuteLimiter(perMinute: number, now = () => Date.now(), sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))) {
+  const started: number[] = [];
+  let queue: Promise<void> = Promise.resolve();
+  return function slot(): Promise<void> {
+    const turn = queue.then(async () => {
+      for (;;) {
+        while (started.length && now() - started[0] >= 60_000) started.shift();
+        if (started.length < perMinute) break;
+        await sleep(60_000 - (now() - started[0]) + 5);
+      }
+      started.push(now());
     });
+    queue = turn.catch(() => {});
+    return turn;
+  };
+}
+
+export function envioClient(graphqlUrl: string, pageSize = 1_000, perMinute = Infinity) {
+  const slot = Number.isFinite(perMinute) ? minuteLimiter(perMinute) : async () => {};
+
+  async function post(text: string, variables: Record<string, unknown>): Promise<Response> {
+    for (let attempt = 0; ; attempt++) {
+      await slot();
+      const res = await fetch(graphqlUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query: text, variables }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      // Over the plan's rate limit anyway (other callers, a restart): wait it out a couple of times.
+      if (res.status !== 429 || attempt >= 2) return res;
+      const retryAfter = Number(res.headers.get('retry-after'));
+      await new Promise((r) => setTimeout(r, Math.min(15_000, retryAfter > 0 ? retryAfter * 1_000 : 5_000)));
+    }
+  }
+
+  async function query<T>(text: string, variables: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
+    const res = await post(text, variables);
     if (!res.ok) throw new Error(`Envio GraphQL answered ${res.status}`);
     const body = (await res.json()) as { data?: unknown; errors?: { message: string }[] };
     if (body.errors?.length) throw new Error(`Envio GraphQL: ${body.errors[0].message}`);

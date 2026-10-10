@@ -119,6 +119,16 @@ export async function tokenRoutes(app: FastifyInstance) {
     if (!envio) throw new HttpError(503, 'Charts and trades need the indexer, which is not configured.');
     return envio;
   };
+  /** The indexer failing (down, or over its plan's rate limit) is a 503 the client can retry, not a 500. */
+  const fromIndexer = async <T>(work: () => Promise<T>): Promise<T> => {
+    try {
+      return await work();
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      app.log.warn(`indexer request failed: ${e instanceof Error ? e.message : String(e)}`);
+      throw new HttpError(503, 'Charts and trades are busy right now. Try again in a moment.');
+    }
+  };
 
   app.get('/tokens', async (req) => {
     const q = query.parse(req.query);
@@ -161,7 +171,7 @@ export async function tokenRoutes(app: FastifyInstance) {
 
   app.get<{ Params: { address: string } }>('/tokens/:address/candles', async (req) => {
     const q = candleQuery.parse(req.query);
-    return cached(`candles:${req.params.address.toLowerCase()}:${q.interval}:${q.limit}`, CACHE_MS, async () => {
+    return fromIndexer(() => cached(`candles:${req.params.address.toLowerCase()}:${q.interval}:${q.limit}`, CACHE_MS, async () => {
       const source = needEnvio();
       const row = await findToken(db, req.params.address);
       const decimals = findPair(row.pairToken)?.decimals ?? 18;
@@ -182,12 +192,12 @@ export async function tokenRoutes(app: FastifyInstance) {
           trades: c.trades,
         })),
       };
-    });
+    }));
   });
 
   app.get<{ Params: { address: string } }>('/tokens/:address/trades', async (req) => {
     const q = tradeQuery.parse(req.query);
-    return cached(`trades:${req.params.address.toLowerCase()}:${q.limit}`, 4_000, async () => {
+    return fromIndexer(() => cached(`trades:${req.params.address.toLowerCase()}:${q.limit}`, 4_000, async () => {
       const source = needEnvio();
       const row = await findToken(db, req.params.address);
       const decimals = findPair(row.pairToken)?.decimals ?? 18;
@@ -204,6 +214,6 @@ export async function tokenRoutes(app: FastifyInstance) {
           txHash: t.txHash,
         })),
       };
-    });
+    }));
   });
 }

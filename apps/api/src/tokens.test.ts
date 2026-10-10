@@ -316,6 +316,17 @@ describe('indexer-backed volume, candles and trades', () => {
     expect(body.trades).toEqual([{ id: '9-1', trader: addr(7), side: 'buy', quote: 0.05, tokens: 25_000_000, price: 2e-9, time: 1_791_500_000, txHash: '0xabc' }]);
   });
 
+  it('answers 503, not 500, when the indexer fails (e.g. over its rate limit)', async () => {
+    const down = async () => {
+      throw new Error('Envio GraphQL answered 429');
+    };
+    await seedWithEnvio(fakeEnvio({ trades: down, candles: down }));
+    const trades = await ctx.app.inject({ method: 'GET', url: `/tokens/${addr(1)}/trades` });
+    expect(trades.statusCode).toBe(503);
+    expect(trades.json().error).toMatch(/busy/);
+    expect((await ctx.app.inject({ method: 'GET', url: `/tokens/${addr(1)}/candles` })).statusCode).toBe(503);
+  });
+
   it('answers 503 for charts and trades without the indexer', async () => {
     const f = fakeSource();
     f.launch(1, 900);
