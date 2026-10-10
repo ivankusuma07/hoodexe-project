@@ -74,9 +74,10 @@ export async function buildApp(deps: Deps) {
   const { env } = deps;
   const app = Fastify({
     logger: env.NODE_ENV === 'test' ? false : { level: env.NODE_ENV === 'production' ? 'info' : 'debug' },
-    // Railway's proxy is the one hop in front of us: req.ip is the address it saw, which callers can't forge
-    // (a client-sent X-Forwarded-For only adds entries further left).
-    trustProxy: env.NODE_ENV === 'production' ? (_address: string, hop: number) => hop === 0 : false,
+    // Railway puts two proxies in front of us (X-Forwarded-For arrives as "client, railway-edge", seen 10 Oct 2026):
+    // trusting exactly those two hops makes req.ip the address Railway's edge saw. A client-sent X-Forwarded-For
+    // only adds entries further left, so it can't be forged.
+    trustProxy: env.NODE_ENV === 'production' ? (_address: string, hop: number) => hop < 2 : false,
     bodyLimit: 64 * 1024,
   });
 
@@ -91,9 +92,17 @@ export async function buildApp(deps: Deps) {
     req.clientIp = req.ip;
     const sent = req.headers['x-hood-proxy-secret'];
     const forwarded = req.headers['x-hood-client-ip'];
-    if (!proxySecret || typeof sent !== 'string' || typeof forwarded !== 'string') return;
-    const given = Buffer.from(sent);
-    if (given.length === proxySecret.length && timingSafeEqual(given, proxySecret) && isIP(forwarded)) req.clientIp = forwarded;
+    if (forwarded === undefined && sent === undefined) return;
+    const given = typeof sent === 'string' ? Buffer.from(sent) : null;
+    const why = !proxySecret
+      ? 'the API has no PROXY_SECRET'
+      : !given || given.length !== proxySecret.length || !timingSafeEqual(given, proxySecret)
+        ? 'wrong or missing proxy secret'
+        : typeof forwarded !== 'string' || !isIP(forwarded)
+          ? 'not an IP address'
+          : null;
+    if (why) req.log.warn(`ignored x-hood-client-ip: ${why}`);
+    else req.clientIp = forwarded as string;
   });
 
   // The default allows GET/HEAD/POST only; PUT /profile needs its preflight to pass too.

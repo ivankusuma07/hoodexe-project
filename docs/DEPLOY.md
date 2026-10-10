@@ -13,7 +13,7 @@ browser ──/api/* + cookie──▶ web (Vercel) ──rewrite──▶ api (
                             api ──eth_call──▶ Alchemy (RPC_URL_SERVER)
 ```
 
-The API has no custom domain. The web app serves it at `/api/*` on its own host (a Next.js rewrite to the Railway
+The API has no custom domain. The web app serves it at `/api/*` on its own host (proxy.ts rewrites to the Railway
 URL), so the browser only ever talks to the web app's site.
 
 ## Before you start: what Bix provides
@@ -107,7 +107,7 @@ docker run --env-file apps/api/.env -e NODE_ENV=production -p 8787:8787 hood-api
 
    ```bash
    NEXT_PUBLIC_API_URL=/api
-   API_PROXY_TARGET=https://<service>.up.railway.app      # read at build time by next.config.ts
+   API_PROXY_TARGET=https://<service>.up.railway.app      # read by apps/web/proxy.ts
    NEXT_PUBLIC_WS_URL=wss://<service>.up.railway.app/ws
    NEXT_PUBLIC_RPC_URL=https://robinhood-mainnet.g.alchemy.com/v2/<browser key, restricted to the web app's domain>
    NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=

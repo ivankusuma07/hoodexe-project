@@ -3,7 +3,7 @@ import { rigorScoreSchema, type RigorScore, type TheoremMetadata } from '@hood/s
 
 /**
  * Typed client for apps/api (docs/BRIEF.md §9). Cookies ride along for the SIWE session. NEXT_PUBLIC_API_URL
- * is either the API's own URL (local dev) or `/api`, proxied to it by next.config.ts (production).
+ * is either the API's own URL (local dev) or `/api`, proxied to it by proxy.ts (production).
  */
 const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ?? '';
 
