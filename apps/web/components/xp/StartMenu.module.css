@@ -123,3 +123,8 @@
   .desc { font-size: 11px; }
   .footerBtn { min-height: 44px; font-size: 13px; }
 }
+
+/* Games ▸ expands in place (a flyout would be clipped on phones). */
+.arrow { margin-left: auto; padding-left: 6px; color: #4b4b4b; }
+.submenu { display: flex; flex-direction: column; margin-left: 22px; border-left: 1px dotted #9db0d6; }
+.subIcon { position: relative; display: inline-flex; margin-right: 8px; }

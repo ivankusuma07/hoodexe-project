@@ -21,7 +21,12 @@ export type AnalyticsEvent =
   | 'trade_submitted'
   | 'trade_confirmed'
   | 'trade_failed'
-  | 'callout_posted';
+  | 'callout_posted'
+  | 'game_opened'
+  | 'solitaire_started'
+  | 'solitaire_won'
+  | 'solitaire_closed'
+  | 'minesweeper_coming_soon_viewed';
 
 type Props = Record<string, string | number | boolean | null | undefined>;
 

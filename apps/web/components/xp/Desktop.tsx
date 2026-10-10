@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useDisconnect } from 'wagmi';
 import { APPS, isAppId, type AppId } from '@/components/apps/meta';
 import { APP_COMPONENTS } from '@/components/apps';
@@ -38,7 +38,8 @@ export function Desktop() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const shared = /^\/t\/(0x[0-9a-fA-F]{40})\/?$/.exec(window.location.pathname)?.[1];
-    const requested = shared ? 'token' : params.get('app');
+    const game = /^\/games\/(solitaire|minesweeper)\/?$/.exec(window.location.pathname)?.[1];
+    const requested = shared ? 'token' : (game ?? params.get('app'));
     const token = shared ?? params.get('t');
     if (useWindows.getState().windows.length > 0) return;
     if (requested === 'token' && token && isAddress(token, { strict: false })) openToken(token);
@@ -53,6 +54,8 @@ export function Desktop() {
         ? '/'
         : active.appId === 'token' && active.props?.address
           ? `/t/${active.props.address}`
+          : active.appId === 'solitaire' || active.appId === 'minesweeper'
+            ? `/games/${active.appId}`
           : `/?app=${active.appId}`;
     if (window.location.pathname + window.location.search !== next) window.history.replaceState(null, '', next);
   }, [windows, activeId]);
@@ -101,7 +104,9 @@ export function Desktop() {
               icon={<app.Icon size={16} />}
               maximizable={app.maximizable !== false}
             >
-              <Content win={win} />
+              <Suspense fallback={<p className={styles.loading}>Loading…</p>}>
+                <Content win={win} />
+              </Suspense>
             </Window>
           );
         })}

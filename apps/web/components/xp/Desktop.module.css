@@ -90,3 +90,4 @@
   .iconImg svg { width: 56px; height: 56px; }
   .label { font-size: 13px; line-height: 15px; max-width: 94px; }
 }
+.loading { padding: 12px; color: #4b4b4b; }

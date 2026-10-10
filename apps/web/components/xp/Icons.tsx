@@ -429,3 +429,59 @@ export function SpeakerIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** Two fanned playing cards: Solitaire. */
+export function SolitaireIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <g transform="rotate(-14 12 18)">
+        <rect x="4" y="6" width="15" height="21" rx="2" fill="#2f5fc8" stroke="#16337a" />
+        <path d="M6.5 8.5 H16.5 V24.5 H6.5 Z" fill="none" stroke="#9fc0ff" strokeWidth=".8" />
+        <path d="M7 11 L16 22 M16 11 L7 22" stroke="#9fc0ff" strokeWidth=".7" />
+      </g>
+      <g transform="rotate(10 20 18)">
+        <rect x="12" y="5" width="15" height="21" rx="2" fill="#fff" stroke="#555" />
+        <text x="14" y="11.5" fontSize="6" fontWeight="700" fontFamily="Tahoma, sans-serif" fill="#c91f00">A</text>
+        <path d="M19.5 13 C17 10.5 14.5 13 16.5 15.5 L19.5 19 L22.5 15.5 C24.5 13 22 10.5 19.5 13 Z" fill="#c91f00" />
+      </g>
+    </Svg>
+  );
+}
+
+/** A mine with a spark: Minesweeper. */
+export function MinesweeperIcon(props: IconProps) {
+  const id = gid(useId());
+  return (
+    <Svg {...props}>
+      <defs>
+        <radialGradient id={`${id}m`} cx=".38" cy=".35" r=".7">
+          <stop offset="0" stopColor="#8a8a8a" />
+          <stop offset=".45" stopColor="#2a2a2a" />
+          <stop offset="1" stopColor="#000" />
+        </radialGradient>
+      </defs>
+      <path d="M16 3 V29 M3 16 H29 M7 7 L25 25 M25 7 L7 25" stroke="#111" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="16" cy="16" r="8.5" fill={`url(#${id}m)`} />
+      <circle cx="13" cy="13" r="2.2" fill="#fff" fillOpacity=".85" />
+    </Svg>
+  );
+}
+
+/** A yellow folder with a card peeking out: the Games folder. */
+export function GamesFolderIcon(props: IconProps) {
+  const id = gid(useId());
+  return (
+    <Svg {...props}>
+      <defs>
+        <linearGradient id={`${id}f`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffe68a" />
+          <stop offset="1" stopColor="#e8b22e" />
+        </linearGradient>
+      </defs>
+      <path d="M3 8 Q3 6 5 6 H12 L14.5 8.5 H27 Q29 8.5 29 10.5 V12 H3 Z" fill="#d79c1c" stroke="#9a6a08" />
+      <rect x="9" y="4" width="10" height="13" rx="1.2" fill="#fff" stroke="#555" transform="rotate(-8 14 10)" />
+      <path d="M14.2 7.6 C12.9 6.3 11.6 7.6 12.6 8.9 L14.2 10.8 L15.8 8.9 C16.8 7.6 15.5 6.3 14.2 7.6 Z" fill="#c91f00" transform="rotate(-8 14 10)" />
+      <path d="M3 12 H29 L27.5 26 Q27.3 27.5 25.8 27.5 H6.2 Q4.7 27.5 4.5 26 Z" fill={`url(#${id}f)`} stroke="#9a6a08" />
+    </Svg>
+  );
+}

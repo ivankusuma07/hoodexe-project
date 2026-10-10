@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { SoonBadge } from '@/components/games/GamesFolder';
 import { useAccountModal, useConnectModal } from '@rainbow-me/rainbowkit';
 import { addressUrl, EXPLORER_MAINNET } from '@hood/shared';
-import { APPS, START_APPS, type AppId } from '@/components/apps/meta';
+import { APPS, GAME_APPS, START_APPS, type AppId } from '@/components/apps/meta';
 import { openApp } from '@/lib/openApp';
 import { useIdentity } from '@/lib/identity';
 import {
@@ -30,6 +31,7 @@ export function StartMenu({ onClose, onLogOff, onShutDown }: StartMenuProps) {
   const { connected, label, role, address } = useIdentity();
   const { openConnectModal } = useConnectModal();
   const { openAccountModal } = useAccountModal();
+  const [gamesOpen, setGamesOpen] = useState(false);
 
   useEffect(() => {
     const onPointer = (e: PointerEvent) => {
@@ -80,6 +82,37 @@ export function StartMenu({ onClose, onLogOff, onShutDown }: StartMenuProps) {
               </button>
             );
           })}
+          <button
+            type="button"
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={gamesOpen}
+            className={styles.item}
+            onClick={() => setGamesOpen((o) => !o)}
+          >
+            <APPS.games.Icon size={32} />
+            <span className={styles.itemText}>
+              <span className={styles.itemName}>Games</span>
+              <span className={styles.desc}>{APPS.games.description}</span>
+            </span>
+            <span className={styles.arrow}>{gamesOpen ? '▾' : '▸'}</span>
+          </button>
+          {gamesOpen && (
+            <div role="menu" className={styles.submenu}>
+              {GAME_APPS.map((id) => {
+                const app = APPS[id];
+                return (
+                  <button key={id} type="button" role="menuitem" className={styles.item} onClick={() => launch(id)}>
+                    <span className={styles.subIcon}>
+                      <app.Icon size={24} />
+                    </span>
+                    <span className={styles.itemName}>{app.label}</span>
+                    {app.comingSoon && <SoonBadge inline />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className={styles.sep} />
           <button type="button" role="menuitem" className={styles.item} onClick={() => launch('welcome')}>
             <HelpIcon size={32} />

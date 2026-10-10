@@ -1,0 +1,282 @@
+'use client';
+
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Button } from '@/components/xp/Button';
+import { Dialog, MessageBox } from '@/components/xp/Dialog';
+import { SolitaireIcon } from '@/components/xp/Icons';
+import { track } from '@/lib/analytics';
+import { useWindows, type WindowState } from '@/store/windows';
+import { canAutoComplete, displayScore, elapsedSeconds } from './solitaire.logic';
+import { SolitaireBoard } from './Solitaire';
+import { useSolitaire } from './useSolitaire';
+import styles from './solitaire.module.css';
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+type Modal = 'stats' | 'help' | 'about' | null;
+
+/** Solitaire.exe (hood-exe-games-brief.md §2): menu bar, board, status bar, dialogs. Lazy-loaded. */
+export default function SolitaireWindow({ win }: { win: WindowState }) {
+  const g = useSolitaire();
+  const { state, settings, stats } = g;
+  const active = useWindows((s) => s.activeId === win.id);
+  const [menu, setMenu] = useState<'game' | 'help' | null>(null);
+  const [modal, setModal] = useState<Modal>(null);
+  // Both refer to one finished game (its finishedAt), so a new deal starts fresh without resetting them.
+  const [celebratedAt, setCelebratedAt] = useState<number | null>(null);
+  const [winSeenAt, setWinSeenAt] = useState<number | null>(null);
+  const celebrated = state.finishedAt != null && celebratedAt === state.finishedAt;
+  const winSeen = state.finishedAt != null && winSeenAt === state.finishedAt;
+  const setCelebrated = () => setCelebratedAt(state.finishedAt);
+  const setWinSeen = () => setWinSeenAt(state.finishedAt);
+  const [, tick] = useState(0);
+  const close = () => useWindows.getState().close(win.id);
+
+  // Analytics: opened, and how long the window stayed open.
+  const openedAt = useRef(0);
+  useEffect(() => {
+    openedAt.current = Date.now();
+    track('game_opened', { game: 'solitaire' });
+    return () => track('solitaire_closed', { duration: Math.round((Date.now() - openedAt.current) / 1_000) });
+  }, []);
+
+  // The clock ticks while a game is under way.
+  useEffect(() => {
+    if (state.startedAt == null || state.status !== 'playing') return;
+    const id = window.setInterval(() => tick((n) => n + 1), 1_000);
+    return () => window.clearInterval(id);
+  }, [state.startedAt, state.status]);
+
+  // Auto-complete: once everything is face up, play the rest one card at a time.
+  const { autoStep } = g;
+  useEffect(() => {
+    if (!settings.autoComplete || !canAutoComplete(state)) return;
+    const id = window.setTimeout(autoStep, 110);
+    return () => window.clearTimeout(id);
+  }, [state, settings.autoComplete, autoStep]);
+
+  // Keyboard (§2.5): F2 / Ctrl+N new game, Ctrl+Z undo. Only while this window is the focused one.
+  const { newGame, undo } = g;
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest('input, textarea, select')) return;
+      if (e.key === 'F2' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n')) {
+        e.preventDefault();
+        newGame();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        undo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [active, newGame, undo]);
+
+  // Menus close on any click outside them.
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenu(null);
+    };
+    window.addEventListener('pointerdown', onDown);
+    return () => window.removeEventListener('pointerdown', onDown);
+  }, [menu]);
+
+  const run = (fn: () => void) => () => {
+    setMenu(null);
+    fn();
+  };
+
+  const seconds = elapsedSeconds(state);
+  const score = displayScore(state);
+
+  return (
+    <div className={styles.window}>
+      <div className={styles.menubar} ref={menuRef} role="menubar">
+        <MenuButton label="Game" open={menu === 'game'} onOpen={() => setMenu(menu === 'game' ? null : 'game')} onHover={() => menu && setMenu('game')}>
+          <MenuItem onClick={run(g.newGame)} shortcut="F2">
+            New Game
+          </MenuItem>
+          <MenuItem onClick={run(g.dealAgain)}>Deal Again</MenuItem>
+          <MenuItem onClick={run(g.undo)} shortcut="Ctrl+Z" disabled={!g.canUndo}>
+            Undo
+          </MenuItem>
+          <hr />
+          <MenuItem onClick={run(() => g.setSettings({ cardBack: 'blue' }))} checked={settings.cardBack === 'blue'}>
+            Blue card back
+          </MenuItem>
+          <MenuItem onClick={run(() => g.setSettings({ cardBack: 'red' }))} checked={settings.cardBack === 'red'}>
+            Red card back
+          </MenuItem>
+          <MenuItem onClick={run(() => g.setSettings({ autoComplete: !settings.autoComplete }))} checked={settings.autoComplete}>
+            Auto-complete
+          </MenuItem>
+          <hr />
+          <MenuItem onClick={run(() => setModal('stats'))}>Statistics…</MenuItem>
+          <hr />
+          <MenuItem onClick={run(close)}>Exit</MenuItem>
+        </MenuButton>
+        <MenuButton label="Help" open={menu === 'help'} onOpen={() => setMenu(menu === 'help' ? null : 'help')} onHover={() => menu && setMenu('help')}>
+          <MenuItem onClick={run(() => setModal('help'))}>How to Play</MenuItem>
+          <MenuItem onClick={run(() => setModal('about'))}>About Solitaire</MenuItem>
+        </MenuButton>
+      </div>
+
+      <SolitaireBoard
+        state={state}
+        back={settings.cardBack}
+        onDraw={g.draw}
+        onMove={g.move}
+        onFoundation={g.toFoundation}
+        celebrated={celebrated}
+        onCelebrated={setCelebrated}
+      />
+
+      <div className={styles.status}>
+        <span>Time: {clock(seconds)}</span>
+        <span>Moves: {state.moves}</span>
+        <span>Score: {score.toLocaleString('en-US')}</span>
+      </div>
+
+      {g.resumable && (
+        <MessageBox
+          title="Solitaire"
+          kind="question"
+          onClose={g.declineResume}
+          buttons={
+            <>
+              <Button onClick={g.resume} data-autofocus>
+                Resume
+              </Button>
+              <Button onClick={g.declineResume}>New Game</Button>
+            </>
+          }
+        >
+          You have an unfinished game ({g.resumable.moves} moves). Resume it?
+        </MessageBox>
+      )}
+
+      {state.status === 'won' && celebrated && !winSeen && (
+        <MessageBox
+          title="Solitaire"
+          kind="info"
+          onClose={setWinSeen}
+          buttons={
+            <>
+              <Button onClick={g.newGame} data-autofocus>
+                New Game
+              </Button>
+              <Button
+                onClick={() => {
+                  setWinSeen();
+                  setModal('stats');
+                }}
+              >
+                Statistics
+              </Button>
+            </>
+          }
+        >
+          <p>
+            <b>You won!</b>
+          </p>
+          <p>
+            Time {clock(seconds)} · {state.moves} moves · Score {score.toLocaleString('en-US')}
+          </p>
+        </MessageBox>
+      )}
+
+      {modal === 'stats' && (
+        <Dialog title="Statistics" onClose={() => setModal(null)} width={300} footer={<Button onClick={() => setModal(null)}>OK</Button>}>
+          <table className={styles.statsTable}>
+            <tbody>
+              <tr>
+                <th>Games played</th>
+                <td>{stats.gamesPlayed}</td>
+              </tr>
+              <tr>
+                <th>Games won</th>
+                <td>
+                  {stats.wins} ({stats.gamesPlayed ? Math.round((stats.wins / stats.gamesPlayed) * 100) : 0}%)
+                </td>
+              </tr>
+              <tr>
+                <th>Current streak</th>
+                <td>{stats.currentStreak}</td>
+              </tr>
+              <tr>
+                <th>Best time</th>
+                <td>{stats.bestTime == null ? '—' : clock(stats.bestTime)}</td>
+              </tr>
+              <tr>
+                <th>Fewest moves</th>
+                <td>{stats.bestMoves ?? '—'}</td>
+              </tr>
+              <tr>
+                <th>Best score</th>
+                <td>{stats.bestScore?.toLocaleString('en-US') ?? '—'}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className={styles.note}>Kept in this browser only.</p>
+        </Dialog>
+      )}
+
+      {modal === 'help' && (
+        <Dialog title="How to Play" onClose={() => setModal(null)} width={380} footer={<Button onClick={() => setModal(null)}>OK</Button>}>
+          <ul className={styles.helpList}>
+            <li>Move every card to the four piles at the top right, by suit, from Ace up to King.</li>
+            <li>In the seven columns, build down in alternating colours: a red 6 on a black 7.</li>
+            <li>Drag a card, or a face-up run, onto another column. Only a King (or a run starting with one) fills an empty column.</li>
+            <li>Click the deck to turn over one card. When it runs out, click it again to turn the pile back over (−15 points).</li>
+            <li>Double-click (double-tap on a phone) or right-click a card to send it to its pile.</li>
+            <li>F2 starts a new game, Ctrl+Z undoes a move.</li>
+            <li>Scoring: +10 to a column from the turned-up pile, +5 from it to the top piles, +10 from a column to the top piles, +5 for turning over a column card, −15 for taking a card back down, −2 every 10 seconds, and a time bonus when you win.</li>
+          </ul>
+        </Dialog>
+      )}
+
+      {modal === 'about' && (
+        <MessageBox title="About Solitaire" onClose={() => setModal(null)}>
+          <div className={styles.about}>
+            <SolitaireIcon size={40} />
+            <div>
+              <p>
+                <b>Solitaire</b> for hood.exe
+              </p>
+              <p>Klondike, turn one. Your games and statistics stay in this browser.</p>
+              <p className={styles.note}>An original recreation; not affiliated with Microsoft.</p>
+            </div>
+          </div>
+        </MessageBox>
+      )}
+    </div>
+  );
+}
+
+function MenuButton({ label, open, onOpen, onHover, children }: { label: string; open: boolean; onOpen: () => void; onHover: () => void; children: ReactNode }) {
+  return (
+    <div className={styles.menuRoot}>
+      <button type="button" className={`${styles.menuTitle} ${open ? styles.menuOpen : ''}`} onClick={onOpen} onPointerEnter={onHover} aria-haspopup="menu" aria-expanded={open}>
+        {label}
+      </button>
+      {open && (
+        <div className={styles.menuList} role="menu">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({ children, onClick, shortcut, checked, disabled }: { children: ReactNode; onClick: () => void; shortcut?: string; checked?: boolean; disabled?: boolean }) {
+  return (
+    <button type="button" role={checked == null ? 'menuitem' : 'menuitemcheckbox'} aria-checked={checked} className={styles.menuItem} onClick={onClick} disabled={disabled}>
+      <span className={styles.check}>{checked ? '✓' : ''}</span>
+      <span>{children}</span>
+      {shortcut && <span className={styles.shortcut}>{shortcut}</span>}
+    </button>
+  );
+}
