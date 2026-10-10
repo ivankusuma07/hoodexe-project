@@ -19,7 +19,7 @@ const appRpc = process.env.NEXT_PUBLIC_RPC_URL || PUBLIC_RPC_MAINNET;
 const walletRpc = appRpc.startsWith('http') ? appRpc : PUBLIC_RPC_MAINNET;
 const transportUrl = appRpc.startsWith('http') ? appRpc : typeof window === 'undefined' ? PUBLIC_RPC_MAINNET : new URL(appRpc, window.location.origin).href;
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window === 'undefined' ? 'https://hood-exe.vercel.app' : window.location.origin);
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window === 'undefined' ? 'https://www.hoodexe.site' : window.location.origin);
 
 export const chain = robinhoodChain(walletRpc);
 

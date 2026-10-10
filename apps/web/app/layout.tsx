@@ -2,12 +2,11 @@ import type { ReactNode } from 'react';
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
-// Absolute URLs for link previews: NEXT_PUBLIC_SITE_URL once there's a domain; on Vercel, Next.js otherwise
-// falls back to the project's production URL.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
+// Absolute URLs for link previews: NEXT_PUBLIC_SITE_URL, else the production domain.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hoodexe.site';
 
 export const metadata: Metadata = {
-  metadataBase: SITE_URL ? new URL(SITE_URL) : undefined,
+  metadataBase: new URL(SITE_URL),
   title: 'hood.exe',
   description: 'Launch coins backed by theorems. Trade on provable rigor. Powered by Robinhood Chain, routed through Pons.',
   applicationName: 'hood.exe',

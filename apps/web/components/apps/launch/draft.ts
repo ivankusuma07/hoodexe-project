@@ -42,7 +42,7 @@ export const EMPTY_DRAFT: Draft = {
   creatorTaxPct: '0',
   buyback: false,
   devBuy: '',
-  socials: { twitter: '', telegram: '', website: 'https://hood.fun' },
+  socials: { twitter: '', telegram: '', website: 'https://www.hoodexe.site' },
 };
 
 export const PAGES = ['identity', 'theorem', 'economics', 'review'] as const;

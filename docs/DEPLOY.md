@@ -90,7 +90,7 @@ down past 100k events), so the indexer runs on Railway as three services in the 
    PINATA_JWT=
    SESSION_SECRET=<openssl rand -hex 32>
    COOKIE_DOMAIN=                            # empty: the cookie belongs to the web app's host
-   CORS_ORIGINS=https://hood-exe.vercel.app  # every origin the web app is served from, comma-separated
+   CORS_ORIGINS=https://www.hoodexe.site,https://hoodexe.site,https://hood-exe.vercel.app  # every origin the web app is served from
    OFFICIAL_WALLETS=0x…,0x…
    BLOCKLIST_EXTRA=
    STAND_INS=refuse                          # 'allow' while DeepSeek/Pinata keys are pending (see below)
@@ -137,9 +137,10 @@ docker run --env-file apps/api/.env -e NODE_ENV=production -p 8787:8787 hood-api
    NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=                   # Reown, project type "App"
    NEXT_PUBLIC_POSTHOG_KEY=phc_…                           # public; add with --type config
    NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
-   NEXT_PUBLIC_SITE_URL=                                   # once there's a domain; link previews use it
+   NEXT_PUBLIC_SITE_URL=https://www.hoodexe.site           # link previews and WalletConnect metadata
    ```
-4. Optional: Domains → `hood.fun`. Then add `https://hood.fun` to the API's `CORS_ORIGINS`.
+4. Domains → `www.hoodexe.site` (primary) and `hoodexe.site` (redirects to www). Every host the app is served
+   from must be in the API's `CORS_ORIGINS`, or sign-in and the live feed refuse it.
 
 ## 4. Smoke test (before the first real launch)
 
