@@ -27,7 +27,7 @@ export const BREAKDOWN: RigorBreakdown = {
   reasoning: "Euler's identity, a classical result.",
 };
 
-export async function setup(opts: { scorer?: Scorer; launches?: Map<string, LaunchOnChain | 'pending' | null>; envio?: EnvioClient; moderator?: Moderator; official?: string } = {}) {
+export async function setup(opts: { scorer?: Scorer; launches?: Map<string, LaunchOnChain | 'pending' | null>; envio?: EnvioClient; moderator?: Moderator; official?: string; env?: Record<string, string> } = {}) {
   const { db, close } = await connectMemory();
   let clock = new Date('2026-10-09T12:00:00Z').getTime();
   const scorerCalls: string[] = [];
@@ -58,7 +58,7 @@ export async function setup(opts: { scorer?: Scorer; launches?: Map<string, Laun
   const moderated: string[] = [];
   const moderator: Moderator = { check: async (text) => (moderated.push(text), { allow: true, reason: 'ok' }) };
   const app = await buildApp({
-    env: loadEnv({ NODE_ENV: 'test', DATABASE_URL: 'memory', CORS_ORIGINS: ORIGIN, OFFICIAL_WALLETS: opts.official ?? '' }),
+    env: loadEnv({ NODE_ENV: 'test', DATABASE_URL: 'memory', CORS_ORIGINS: ORIGIN, OFFICIAL_WALLETS: opts.official ?? '', ...opts.env }),
     db,
     kv: memoryKv(() => clock),
     scorer,

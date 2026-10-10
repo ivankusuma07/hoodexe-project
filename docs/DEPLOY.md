@@ -79,7 +79,13 @@ sign in unless their host is added there.
    CORS_ORIGINS=https://hood-exe.vercel.app  # every origin the web app is served from, comma-separated
    OFFICIAL_WALLETS=0x…,0x…
    BLOCKLIST_EXTRA=
+   STAND_INS=refuse                          # 'allow' while DeepSeek/Pinata keys are pending (see below)
    ```
+
+   While the DeepSeek and Pinata keys are pending, `STAND_INS=allow` lets production start without them:
+   theorems come back unscored, callouts get the blocklist only, and `/ipfs` answers 503, which blocks every
+   launch before a transaction is sent. Until the indexer exists, set `TOKEN_INDEX=off` (Explore stays empty).
+   Remove both once the keys and `ENVIO_GRAPHQL_URL` are set.
 
    The API refuses to start in production without Redis, DeepSeek, Pinata, the RPC, the indexer, or a real
    session secret, and says which one is missing. Migrations run on start. The API and the worker take turns

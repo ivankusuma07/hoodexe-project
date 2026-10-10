@@ -41,10 +41,16 @@ const envSchema = z
     OFFICIAL_WALLETS: list(''),
     /** Extra blocklist terms for callouts, comma-separated. */
     BLOCKLIST_EXTRA: list(''),
+    /**
+     * 'allow' lets production run without DeepSeek and Pinata while they're being set up: theorems come back
+     * unscored, callouts get the blocklist only, and /ipfs refuses, which blocks launches before any transaction.
+     */
+    STAND_INS: z.enum(['refuse', 'allow']).default('refuse'),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;
-    for (const key of ['REDIS_URL', 'DEEPSEEK_API_KEY', 'PINATA_JWT', 'RPC_URL_SERVER'] as const) {
+    const required = env.STAND_INS === 'allow' ? (['REDIS_URL', 'RPC_URL_SERVER'] as const) : (['REDIS_URL', 'DEEPSEEK_API_KEY', 'PINATA_JWT', 'RPC_URL_SERVER'] as const);
+    for (const key of required) {
       if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: 'required in production' });
     }
     if (env.TOKEN_INDEX === 'on' && !env.ENVIO_GRAPHQL_URL) {

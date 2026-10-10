@@ -148,6 +148,17 @@ describe('POST /ipfs', () => {
     expect((await upload(undefined, PNG, metadata())).statusCode).toBe(401);
   });
 
+  it('refuses in production without Pinata, so nothing launches with a dead link', async () => {
+    await ctx.close();
+    ctx = await setup({
+      env: { NODE_ENV: 'production', STAND_INS: 'allow', REDIS_URL: 'redis://x', RPC_URL_SERVER: 'https://rpc', TOKEN_INDEX: 'off', SESSION_SECRET: 'x'.repeat(40) },
+    });
+    const res = await upload(await signIn(ctx), PNG, metadata());
+    expect(res.statusCode).toBe(503);
+    expect(res.json().error).toMatch(/Launching is paused/);
+    expect(ctx.pinner.files.size).toBe(0);
+  });
+
   it('pins the logo and metadata with the server score, not the client one', async () => {
     const cookie = await signIn(ctx);
     // Unscored statement: a client-claimed 100 is dropped.
@@ -252,5 +263,12 @@ describe('loadEnv', () => {
 
   it('refuses to run production on stand-ins', () => {
     expect(() => loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://x' })).toThrow(/DEEPSEEK_API_KEY[\s\S]*SESSION_SECRET/);
+  });
+
+  it('runs production without DeepSeek and Pinata only when stand-ins are allowed', () => {
+    const base = { NODE_ENV: 'production', DATABASE_URL: 'postgres://x', REDIS_URL: 'redis://x', RPC_URL_SERVER: 'https://rpc', TOKEN_INDEX: 'off', SESSION_SECRET: 'x'.repeat(40) };
+    expect(() => loadEnv(base)).toThrow(/DEEPSEEK_API_KEY[\s\S]*PINATA_JWT/);
+    expect(loadEnv({ ...base, STAND_INS: 'allow' }).STAND_INS).toBe('allow');
+    expect(() => loadEnv({ ...base, STAND_INS: 'allow', REDIS_URL: '' })).toThrow(/REDIS_URL/);
   });
 });
