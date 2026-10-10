@@ -9,7 +9,7 @@ separate staging network to maintain.
 browser ──/api/* + cookie──▶ web (Vercel) ──rewrite──▶ api (Railway, *.up.railway.app) ──▶ Postgres, Redis
    └────────── wss://…/ws (live feed, direct) ─────────▶        ▲                              ▲
                                                  worker (Railway) ┘──── Redis pub/sub ─────────┘
-                            api + worker ──GraphQL──▶ Envio hosted (apps/indexer)
+                            api + worker ──GraphQL (private)──▶ hasura ◀── indexer (Railway, apps/indexer)
                             api ──eth_call──▶ Alchemy (RPC_URL_SERVER)
 ```
 
@@ -43,16 +43,27 @@ Railway URL directly. It needs no cookie, and the API only accepts origins liste
 Sign-in only accepts messages naming a host in `CORS_ORIGINS`. Vercel preview deployments can browse but can't
 sign in unless their host is added there.
 
-## 1. Indexer: Envio hosted
+## 1. Indexer: self-hosted on Railway
 
-1. In Envio, create a deployment from this GitHub repo: root directory `apps/indexer`, config `config.yaml`
-   (it starts at the V2 factory's deployment block, 26,841,846).
-2. Wait for it to sync to the chain head. Note its GraphQL URL; it becomes `ENVIO_GRAPHQL_URL`.
-3. Check that uint256 amounts arrive as strings. Locally Hasura runs with
-   `HASURA_GRAPHQL_STRINGIFY_NUMERIC_TYPES=true`; if the hosted endpoint returns them as JSON numbers, amounts
-   above 2^53 lose precision. Query it with
-   `{ Trade(limit: 1, order_by: {quoteAmount: desc}) { quoteAmount } }`. The value must be quoted. If it isn't, ask
-   Envio to enable the setting before going further.
+Envio Cloud's free plan can't hold Pons on Robinhood Chain (about 480k curve trades a day; it shut deployments
+down past 100k events), so the indexer runs on Railway as three services in the same project:
+
+| Service | What | Notes |
+| --- | --- | --- |
+| `indexer` | `apps/indexer/Dockerfile` (`envio start`, `config.selfhost.yaml`) | Needs `ENVIO_API_TOKEN` (a free HyperSync token from envio.dev/app/api-tokens), `ENVIO_PG_*` from its Postgres, `HASURA_GRAPHQL_ENDPOINT=http://${{hasura.RAILWAY_PRIVATE_DOMAIN}}:8080/v1/metadata` and `HASURA_GRAPHQL_ADMIN_SECRET`. No public domain. |
+| `hasura` | image `hasura/graphql-engine:v2.48.5` | `HASURA_GRAPHQL_DATABASE_URL` (the indexer's Postgres), `HASURA_GRAPHQL_ADMIN_SECRET`, `HASURA_GRAPHQL_UNAUTHORIZED_ROLE=public`, `HASURA_GRAPHQL_STRINGIFY_NUMERIC_TYPES=true` (uint256 amounts as strings), `HASURA_GRAPHQL_ENABLE_CONSOLE=false`. No public domain. |
+| a Postgres | the indexer's own database | Separate from the API's. |
+
+- The API and worker reach it privately: `ENVIO_GRAPHQL_URL=http://hasura.railway.internal:8080/v1/graphql`.
+- **Storage (Railway Hobby caps a volume at 5 GB):** the indexer keeps per-wallet `Position`s (average cost) instead
+  of every trade, and the worker (`INDEXER_DATABASE_URL` = the indexer's Postgres) prunes trades after 7 days and
+  1m/5m/1h candles after 1/3/10 days, hourly. Expect a steady state of 2–3 GB.
+- **Sync speed:** curve trades are matched by event signature (wildcard), so a free HyperSync token (5 requests a
+  minute) works. `config.selfhost.yaml` starts on 3 Oct 2026 (block 79,050,000), which synced in about an hour;
+  Portfolio cost basis covers buys from then on. `config.yaml` (from the factory's deployment) would take most of
+  a day on the free token.
+- Deploy with `npx @railway/cli up --service indexer`. It resumes from the database; never run `envio start --restart`
+  there, which wipes the index.
 
 ## 2. API and worker: Railway
 
@@ -71,7 +82,8 @@ sign in unless their host is added there.
    DATABASE_URL=${{Postgres.DATABASE_URL}}
    REDIS_URL=${{Redis.REDIS_URL}}
    RPC_URL_SERVER=https://robinhood-mainnet.g.alchemy.com/v2/<server key>
-   ENVIO_GRAPHQL_URL=<from step 1>
+   ENVIO_GRAPHQL_URL=http://hasura.railway.internal:8080/v1/graphql
+   INDEXER_DATABASE_URL=${{<indexer Postgres>.DATABASE_URL}}   # worker only: hourly pruning
    DEEPSEEK_API_KEY=
    PINATA_JWT=
    SESSION_SECRET=<openssl rand -hex 32>

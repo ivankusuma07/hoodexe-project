@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+# Self-hosted indexer on Railway (docs/DEPLOY.md): same as config.yaml but starts 7 days before it went live
+# (3 Oct 2026), the fastest catch-up on a free HyperSync token. Portfolio cost basis covers buys from then on.
+# Local development uses config.dev.yaml, which starts near the chain head.
+name: hood-exe
+handlers: ./src/handlers
+# Robinhood Chain is an L2 without practical reorgs; skipping rollback history speeds the historical sync and
+# keeps envio_history_* tables empty (the self-hosted database is small, docs/DEPLOY.md).
+rollback_on_reorg: false
+contracts:
+  - name: PonsV2Factory
+    events:
+      - event: TokenLaunched(address indexed token, address indexed curve, address indexed deployer, address pairToken, uint256 launchConfigId, uint256 graduationThreshold)
+      - event: LaunchSwept(address indexed token, uint256 quoteOut, uint256 tokenOut)
+      - event: PoolGraduated(address indexed token, uint256 positionId, uint256 tokenAmount, uint256 pairTokenAmount)
+  # One per launch. Handlers match its events by signature (wildcard) and check the Curve table, so no addresses.
+  - name: PonsV2Curve
+    events:
+      - event: CurveBuy(address indexed buyer, address indexed recipient, uint256 quoteIn, uint256 tokensOut, uint256 fee, uint256 tax)
+        field_selection:
+          transaction_fields:
+            - hash
+      - event: CurveSell(address indexed seller, address indexed recipient, uint256 tokensIn, uint256 quoteOut, uint256 fee, uint256 tax)
+        field_selection:
+          transaction_fields:
+            - hash
+chains:
+  - id: 4663
+    # About 3 Oct 2026, 11:00 UTC (the chain makes ~843k blocks a day).
+    start_block: 79050000
+    contracts:
+      - name: PonsV2Factory
+        address: "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"
+      - name: PonsV2Curve

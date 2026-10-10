@@ -3,7 +3,7 @@
 Token launchpad for Robinhood Chain in a Luna-style desktop. Launches and trades route to Pons V2.
 
 - Spec: [docs/BRIEF.md](docs/BRIEF.md) (v1.0 + v1.1 merged; v1.1 wins on conflicts)
-- Deploying: [docs/DEPLOY.md](docs/DEPLOY.md) (Vercel, Railway, Envio hosted)
+- Deploying: [docs/DEPLOY.md](docs/DEPLOY.md) (Vercel, Railway, self-hosted indexer)
 - Original briefs: `hood-exe-dev-brief.md` (v1.0), `hood.exe_developer_briefv1.1.md` (v1.1)
 
 ## Layout
@@ -11,7 +11,7 @@ Token launchpad for Robinhood Chain in a Luna-style desktop. Launches and trades
 ```
 apps/web/          Next.js 16.4 frontend (Vercel)
 apps/api/          Fastify 5 API: SIWE sessions, rigor scoring, IPFS pinning, launch records, Explore, charts and trades (Railway)
-apps/indexer/      Envio HyperIndex: Pons V2 launches, curve trades, candles, graduations (Envio hosted)
+apps/indexer/      Envio HyperIndex: Pons V2 launches, curve trades, candles, graduations, wallet positions (self-hosted on Railway)
 packages/shared/   Chain config, Pons V2 ABIs and quote maths, zod schemas, shared helpers
 ```
 

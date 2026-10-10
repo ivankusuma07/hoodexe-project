@@ -7,6 +7,6 @@ COPY apps/indexer/package.json ./
 RUN npm install --no-package-lock --no-audit --no-fund
 COPY apps/indexer/ ./
 
-ENV ENVIO_CONFIG=config.yaml ENVIO_TUI=false
+ENV ENVIO_CONFIG=config.selfhost.yaml ENVIO_TUI=false
 # `envio start` runs codegen, then resumes from the database (never `--restart` here: it wipes the index).
 CMD ["npx", "envio", "start"]
