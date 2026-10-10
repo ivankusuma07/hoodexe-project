@@ -197,7 +197,8 @@ export async function tokenRoutes(app: FastifyInstance) {
 
   app.get<{ Params: { address: string } }>('/tokens/:address/trades', async (req) => {
     const q = tradeQuery.parse(req.query);
-    return fromIndexer(() => cached(`trades:${req.params.address.toLowerCase()}:${q.limit}`, 4_000, async () => {
+    // 10 s: viewers of one coin share it, which keeps them inside Envio's per-minute query budget.
+    return fromIndexer(() => cached(`trades:${req.params.address.toLowerCase()}:${q.limit}`, 10_000, async () => {
       const source = needEnvio();
       const row = await findToken(db, req.params.address);
       const decimals = findPair(row.pairToken)?.decimals ?? 18;

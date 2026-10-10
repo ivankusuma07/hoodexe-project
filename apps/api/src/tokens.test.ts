@@ -54,6 +54,18 @@ afterEach(async () => {
 });
 
 describe('token index', () => {
+  it('stores coins whose metadata contains NUL characters', async () => {
+    const f = fakeSource();
+    f.launch(1, 600, { name: 'Bad\u0000Coin', symbol: 'B\u0000D', description: 'x\u0000y' });
+    f.launch(2, 601);
+    await tokenIndex(ctx.db, f.source, opts).sync();
+    const rows = await ctx.db.select().from(schema.tokens);
+    expect(rows.map((r) => [r.symbol, r.name]).sort()).toEqual([
+      ['BD', 'BadCoin'],
+      ['C2', 'Coin 2'],
+    ]);
+  });
+
   it('backfills a window, then resumes from its cursor in chunks', async () => {
     const f = fakeSource();
     f.launch(1, 400); // before the backfill window (latest 1000 - 500)

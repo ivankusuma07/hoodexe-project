@@ -16,7 +16,7 @@ const { db, close } = await connectPostgres(env.DATABASE_URL);
 const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2, family: 0 });
 const pubsub = redisPubSub(redis);
 // Its share of Envio's per-minute query limit; the API takes 60 (src/index.ts).
-const envio = env.ENVIO_GRAPHQL_URL ? envioClient(env.ENVIO_GRAPHQL_URL, 1_000, 20) : undefined;
+const envio = env.ENVIO_GRAPHQL_URL ? envioClient(env.ENVIO_GRAPHQL_URL, 1_000, { background: 20 }) : undefined;
 if (!envio) console.warn('No ENVIO_GRAPHQL_URL: big-buy callouts are off; launches and graduations still post.');
 
 const log = (msg: string) => console.log(`[worker] ${new Date().toISOString()} ${msg}`);

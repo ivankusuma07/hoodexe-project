@@ -31,6 +31,8 @@ export type Activity = { volume: bigint; trades: number };
 
 const TOKEN_LAUNCHED_TOPIC = toEventSelector(ponsFactoryAbi.find((x) => x.type === 'event' && x.name === 'TokenLaunched')!);
 
+const noNul = (s: string) => s.replace(/\u0000/g, '');
+
 export function rpcLaunchSource(rpcUrl: string = PUBLIC_RPC_MAINNET): LaunchSource {
   const client = createPublicClient({ chain: robinhoodChain(rpcUrl), transport: http(rpcUrl, { retryCount: 3 }) });
   const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max) : s);
@@ -149,7 +151,10 @@ export function tokenIndex(db: Db, source: LaunchSource, opts: TokenIndexOptions
       const meta = await source.metadata(batch.map((l) => l.token));
       const rows = await Promise.all(
         batch.map(async (l) => {
-          const m = meta.get(l.token) ?? { name: '', symbol: '', logo: '', description: '' };
+          const raw = meta.get(l.token) ?? { name: '', symbol: '', logo: '', description: '' };
+          // Anyone can launch a Pons coin with any metadata; Postgres text can't hold NUL, and one such coin
+          // would fail the whole batch.
+          const m = { name: noNul(raw.name), symbol: noNul(raw.symbol), logo: noNul(raw.logo), description: noNul(raw.description) };
           const parsed = parseDescription(m.description);
           const scored = parsed ? await storedScore(db, parsed.statement) : undefined;
           return {
@@ -255,7 +260,11 @@ export function tokenIndex(db: Db, source: LaunchSource, opts: TokenIndexOptions
   }
 
   const guard = (name: string, fn: () => Promise<unknown>) => () =>
-    fn().catch((e) => opts.log?.(`token index ${name} failed: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`));
+    fn().catch((e) => {
+      // Drizzle wraps the database's error (the useful part) as the cause of a long "Failed query: …" message.
+      const cause = e instanceof Error && e.cause instanceof Error ? ` (${e.cause.message})` : '';
+      opts.log?.(`token index ${name} failed: ${e instanceof Error ? e.message.split('\n')[0].slice(0, 120) : String(e)}${cause}`);
+    });
 
   return {
     sync,

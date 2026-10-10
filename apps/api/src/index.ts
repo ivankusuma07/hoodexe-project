@@ -19,8 +19,9 @@ const kv = redis ? redisKv(redis) : memoryKv();
 const pubsub = redis ? redisPubSub(redis) : memoryPubSub();
 const deepseek = env.DEEPSEEK_API_KEY ? { apiKey: env.DEEPSEEK_API_KEY, baseURL: env.DEEPSEEK_BASE_URL, model: env.DEEPSEEK_MODEL, log: (m: string) => console.warn(m) } : null;
 
-// Envio's free plan allows 100 queries a minute in total; the worker takes 20 (src/worker.ts).
-const envio = env.ENVIO_GRAPHQL_URL ? envioClient(env.ENVIO_GRAPHQL_URL, 1_000, 60) : undefined;
+// Envio's free plan allows 100 queries a minute in total: 40 for the token index, 20 for visitors' charts,
+// trades and portfolios, 20 for the worker (src/worker.ts).
+const envio = env.ENVIO_GRAPHQL_URL ? envioClient(env.ENVIO_GRAPHQL_URL, 1_000, { background: 40, interactive: 20 }) : undefined;
 
 const app = await buildApp({
   env,

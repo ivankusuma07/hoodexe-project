@@ -66,12 +66,20 @@ export function minuteLimiter(perMinute: number, now = () => Date.now(), sleep =
   };
 }
 
-export function envioClient(graphqlUrl: string, pageSize = 1_000, perMinute = Infinity) {
-  const slot = Number.isFinite(perMinute) ? minuteLimiter(perMinute) : async () => {};
+/** Background work (launch sync, volume, system callouts) and visitor requests (charts, trades, portfolio). */
+type Lane = 'background' | 'interactive';
 
-  async function post(text: string, variables: Record<string, unknown>): Promise<Response> {
+/**
+ * `limits` caps queries per minute per lane, so a visitor's chart never queues behind a backfill. Unset lanes
+ * are unlimited.
+ */
+export function envioClient(graphqlUrl: string, pageSize = 1_000, limits: Partial<Record<Lane, number>> = {}) {
+  const lane = (n: number | undefined) => (n != null && Number.isFinite(n) ? minuteLimiter(n) : async () => {});
+  const slots: Record<Lane, () => Promise<void>> = { background: lane(limits.background), interactive: lane(limits.interactive) };
+
+  async function post(text: string, variables: Record<string, unknown>, which: Lane): Promise<Response> {
     for (let attempt = 0; ; attempt++) {
-      await slot();
+      await slots[which]();
       const res = await fetch(graphqlUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -85,8 +93,8 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000, perMinute = In
     }
   }
 
-  async function query<T>(text: string, variables: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
-    const res = await post(text, variables);
+  async function query<T>(text: string, variables: Record<string, unknown>, schema: z.ZodType<T>, which: Lane = 'background'): Promise<T> {
+    const res = await post(text, variables, which);
     if (!res.ok) throw new Error(`Envio GraphQL answered ${res.status}`);
     const body = (await res.json()) as { data?: unknown; errors?: { message: string }[] };
     if (body.errors?.length) throw new Error(`Envio GraphQL: ${body.errors[0].message}`);
@@ -94,10 +102,10 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000, perMinute = In
   }
 
   /** Runs a paged query (it must take $limit and $offset) until a short page; `field` names the rows. */
-  async function all<T>(text: string, variables: Record<string, unknown>, schema: z.ZodType<T[]>, field: string): Promise<T[]> {
+  async function all<T>(text: string, variables: Record<string, unknown>, schema: z.ZodType<T[]>, field: string, which: Lane = 'background'): Promise<T[]> {
     const out: T[] = [];
     for (let offset = 0; ; offset += pageSize) {
-      const page = await query(text, { ...variables, limit: pageSize, offset }, z.object({ [field]: schema }).transform((d) => d[field] as T[]));
+      const page = await query(text, { ...variables, limit: pageSize, offset }, z.object({ [field]: schema }).transform((d) => d[field] as T[]), which);
       out.push(...page);
       if (page.length < pageSize) return out;
     }
@@ -169,6 +177,7 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000, perMinute = In
         }`,
         { token, interval, limit },
         z.object({ Candle: z.array(candleRow) }),
+        'interactive',
       );
       return data.Candle.reverse();
     },
@@ -199,6 +208,7 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000, perMinute = In
         { wallet },
         z.array(z.object({ token: z.string(), trader: z.string(), recipient: z.string(), isBuy: z.boolean(), quoteAmount: big, tokenAmount: big })),
         'Trade',
+        'interactive',
       );
       return rows.slice(0, max);
     },
@@ -213,6 +223,7 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000, perMinute = In
         }`,
         { token, limit },
         z.object({ Trade: z.array(tradeRow) }),
+        'interactive',
       );
       return data.Trade;
     },
