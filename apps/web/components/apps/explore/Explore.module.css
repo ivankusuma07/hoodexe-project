@@ -23,6 +23,7 @@
 }
 .tab:hover { border-top: 2px solid #f9c94c; padding-top: 2px; }
 .tabActive { margin-top: 0; padding-bottom: 4px; background: #fff; border-top: 2px solid var(--hood-accent); }
+.search { flex: 1 1 140px; min-width: 0; max-width: 240px; margin: 0 0 4px auto; }
 .sort { margin-bottom: 4px; white-space: nowrap; }
 
 .view { flex: 1 1 auto; min-height: 0; overflow: auto; background: #fff; padding: 8px; }
@@ -87,4 +88,5 @@
 @media (max-width: 640px) {
   .grid { grid-template-columns: 1fr 1fr; }
   .toolbar { flex-wrap: wrap; }
+  .search { order: 3; flex-basis: 100%; max-width: none; margin-left: 0; }
 }

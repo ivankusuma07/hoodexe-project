@@ -180,6 +180,36 @@ describe('envioLaunchSource', () => {
   });
 });
 
+describe('GET /tokens?q= (search)', () => {
+  async function seedNames() {
+    const f = fakeSource();
+    f.launch(1, 600, { symbol: 'PEPE', name: 'Pepe Classic' });
+    f.launch(2, 700, { symbol: 'PEPEX', name: 'Another frog' });
+    f.launch(3, 800, { symbol: 'FROG', name: 'Not a pepe, honest' });
+    f.launch(4, 900, { symbol: 'X_Y', name: '100% real' });
+    await tokenIndex(ctx.db, f.source, opts).sync();
+  }
+  const search = (q: string) =>
+    ctx.app.inject({ method: 'GET', url: `/tokens?q=${encodeURIComponent(q)}` }).then((r) => r.json() as Promise<{ items: { symbol: string }[]; total: number }>);
+
+  it('matches ticker prefixes and names, exact ticker first', async () => {
+    await seedNames();
+    const r = await search('pepe');
+    expect(r.items.map((i) => i.symbol)).toEqual(['PEPE', 'FROG', 'PEPEX']);
+    expect(r.total).toBe(3);
+    expect((await search('$pepex')).items.map((i) => i.symbol)).toEqual(['PEPEX']);
+    expect((await search('frog')).items.map((i) => i.symbol).sort()).toEqual(['FROG', 'PEPEX']);
+  });
+
+  it('finds a contract address in any case, and treats % and _ literally', async () => {
+    await seedNames();
+    expect((await search(addr(3).toUpperCase().replace('0X', '0x'))).items.map((i) => i.symbol)).toEqual(['FROG']);
+    expect((await search('100%')).items.map((i) => i.symbol)).toEqual(['X_Y']);
+    expect((await search('x_')).items.map((i) => i.symbol)).toEqual(['X_Y']);
+    expect((await search('zzz')).total).toBe(0);
+  });
+});
+
 describe('GET /tokens', () => {
   async function seed() {
     await ctx.app.inject({ method: 'POST', url: '/score-theorem', payload: { statement: STATEMENT } });

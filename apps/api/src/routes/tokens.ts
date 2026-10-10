@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { asc, count, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, or, sql, type SQL } from 'drizzle-orm';
 import { formatUnits, isAddress } from 'viem';
 import { z } from 'zod';
 import { PONS_TOTAL_SUPPLY, findPair } from '@hood/shared';
@@ -14,7 +14,40 @@ const query = z.object({
   sort: z.enum(['latest', 'volume', 'mcap', 'rigor']).default('latest'),
   limit: z.coerce.number().int().min(1).max(60).default(36),
   offset: z.coerce.number().int().min(0).max(5_000).default(0),
+  /** Ticker (prefix, `import type { FastifyInstance } from 'fastify';
+import { and, asc, count, desc, eq, or, sql, type SQL } from 'drizzle-orm';
+import { formatUnits, isAddress } from 'viem';
+import { z } from 'zod';
+import { PONS_TOTAL_SUPPLY, findPair } from '@hood/shared';
+import { HttpError } from '../app';
+import { schema, type Db } from '../db';
+import type { EnvioCandle } from '../services/envio';
+
+const CACHE_MS = 10_000;
+
+const query = z.object({
+  tab: z.enum(['all', 'hood']).default('all'),
+  sort: z.enum(['latest', 'volume', 'mcap', 'rigor']).default('latest'),
+  limit: z.coerce.number().int().min(1).max(60).default(36),
+ optional), name (substring) or contract address (exact). */
+  q: z.string().trim().max(64).optional(),
 });
+
+/** LIKE pattern text with its wildcards escaped. */
+const likeEscape = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/** Explore's search: the WHERE clause, and the ordering that puts an exact ticker match first. */
+function searchFilter(raw: string | undefined): { where?: SQL; first?: SQL } {
+  const text = raw?.replace(/^\$/, '').trim().toLowerCase();
+  if (!text) return {};
+  if (isAddress(text, { strict: false })) return { where: sql`lower(${schema.tokens.tokenAddress}) = ${text}` };
+  const symbol = sql`lower(${schema.tokens.symbol})`;
+  const like = likeEscape(text);
+  return {
+    where: or(sql`${symbol} like ${`${like}%`}`, sql`lower(${schema.tokens.name}) like ${`%${like}%`}`),
+    first: sql`(${symbol} = ${text}) desc`,
+  };
+}
 
 /** Chart intervals (docs/BRIEF.md §5.4). 15m is built from 5m candles; the indexer stores the rest. */
 export const CHART_INTERVALS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3_600, '1d': 86_400 } as const;
@@ -133,7 +166,8 @@ export async function tokenRoutes(app: FastifyInstance) {
   app.get('/tokens', async (req) => {
     const q = query.parse(req.query);
     return cached(JSON.stringify(q), CACHE_MS, async () => {
-      const where = q.tab === 'hood' ? eq(schema.tokens.hood, true) : undefined;
+      const search = searchFilter(q.q);
+      const where = and(q.tab === 'hood' ? eq(schema.tokens.hood, true) : undefined, search.where);
       // Amounts across pairs aren't comparable without USD prices (Phase 2). Pons sizes each pair's
       // graduation threshold to a similar value, and every curve has the same shape relative to it, so
       // ranking by amount ÷ threshold compares coins across pairs.
@@ -152,7 +186,7 @@ export async function tokenRoutes(app: FastifyInstance) {
           .select()
           .from(schema.tokens)
           .where(where)
-          .orderBy(...order)
+          .orderBy(...(search.first ? [search.first, ...order] : order))
           .limit(q.limit)
           .offset(q.offset),
         db.select({ total: count() }).from(schema.tokens).where(where),

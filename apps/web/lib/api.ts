@@ -111,11 +111,12 @@ export type TokenItem = z.infer<typeof tokenItemSchema>;
 const tokenPageSchema = z.object({ items: z.array(tokenItemSchema), total: z.number(), hoodCount: z.number(), offset: z.number(), volume: z.boolean() });
 export type TokenPage = z.infer<typeof tokenPageSchema>;
 
-export type TokenQuery = { tab: 'all' | 'hood'; sort: 'latest' | 'volume' | 'mcap' | 'rigor'; limit: number; offset: number };
+export type TokenQuery = { tab: 'all' | 'hood'; sort: 'latest' | 'volume' | 'mcap' | 'rigor'; limit: number; offset: number; q?: string };
 
 /** GET /tokens: Explore's grid. */
 export function fetchTokens(q: TokenQuery): Promise<TokenPage> {
   const params = new URLSearchParams({ tab: q.tab, sort: q.sort, limit: String(q.limit), offset: String(q.offset) });
+  if (q.q) params.set('q', q.q);
   return request(`/tokens?${params}`, { method: 'GET' }, tokenPageSchema);
 }
 

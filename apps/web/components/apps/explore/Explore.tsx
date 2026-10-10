@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { RIGOR_DISCLAIMER } from '@hood/shared';
 import { Button } from '@/components/xp/Button';
@@ -28,12 +28,20 @@ const SORTS: { id: TokenQuery['sort']; label: string; needsIndexer?: boolean }[]
 export function Explore({ win }: { win: WindowState }) {
   const [tab, setTab] = useState<TokenQuery['tab'] | null>(null);
   const [sort, setSort] = useState<TokenQuery['sort']>('latest');
+  const [text, setText] = useState('');
+  const [search, setSearch] = useState('');
+  // Search once typing pauses; 2+ characters, or an empty box to go back to the full list.
+  useEffect(() => {
+    const next = text.trim();
+    const id = window.setTimeout(() => setSearch(next.length >= 2 ? next : ''), 300);
+    return () => window.clearTimeout(id);
+  }, [text]);
 
   // The tab is decided by the first answer (hoodCount), so the very first page always loads "all".
   const effectiveTab = tab ?? 'all';
   const q = useInfiniteQuery({
-    queryKey: ['tokens', effectiveTab, sort],
-    queryFn: ({ pageParam }) => fetchTokens({ tab: effectiveTab, sort, limit: PAGE, offset: pageParam }),
+    queryKey: ['tokens', effectiveTab, sort, search],
+    queryFn: ({ pageParam }) => fetchTokens({ tab: effectiveTab, sort, limit: PAGE, offset: pageParam, q: search || undefined }),
     initialPageParam: 0,
     getNextPageParam: (last) => (last.offset + last.items.length < last.total ? last.offset + last.items.length : undefined),
     refetchInterval: win.minimized ? false : 15_000,
@@ -62,6 +70,16 @@ export function Explore({ win }: { win: WindowState }) {
             </button>
           ))}
         </div>
+        <input
+          type="search"
+          className={styles.search}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Search ticker, name or 0x…"
+          aria-label="Search coins"
+          maxLength={64}
+          spellCheck={false}
+        />
         <label className={styles.sort}>
           Sort by:{' '}
           <select value={sort} onChange={(e) => setSort(e.target.value as TokenQuery['sort'])}>
@@ -83,6 +101,11 @@ export function Explore({ win }: { win: WindowState }) {
           <p className={styles.empty}>Looking for coins…</p>
         ) : q.isError ? (
           <p className={styles.empty}>{q.error instanceof ApiError ? q.error.message : 'Could not load coins.'}</p>
+        ) : items.length === 0 && search ? (
+          <div className={styles.empty}>
+            <p>No coins match “{search}”{effectiveTab === 'hood' ? ' among hood.exe launches' : ''}.</p>
+            {effectiveTab === 'hood' && <Button onClick={() => setTab('all')}>Search All Pons</Button>}
+          </div>
         ) : items.length === 0 ? (
           <div className={styles.empty}>
             <p>{effectiveTab === 'hood' ? 'No hood.exe launches yet.' : 'No coins indexed yet.'}</p>
