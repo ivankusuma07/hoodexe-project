@@ -3,14 +3,11 @@
 import { useEffect, useRef } from 'react';
 import { CandlestickSeries, HistogramSeries, createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
 import type { Candles } from '@/lib/api';
+import { formatNumber } from '../explore/format';
 
-/** Memecoin prices run to 1e-9 and below: exponent form keeps the axis readable. */
+/** Memecoin prices run to 1e-9 and below: subscript-zero form (0.0₈17) keeps them short and readable. */
 export function formatPrice(p: number): string {
-  if (p === 0) return '0';
-  const abs = Math.abs(p);
-  if (abs < 0.0001) return p.toExponential(2);
-  if (abs < 1) return p.toPrecision(3);
-  return p.toLocaleString('en-US', { maximumFractionDigits: 4 });
+  return formatNumber(p, { maxDecimals: 4 });
 }
 
 /**
