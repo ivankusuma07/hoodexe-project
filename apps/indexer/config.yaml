@@ -3,6 +3,9 @@
 # Local development uses config.dev.yaml, which starts near the chain head.
 name: hood-exe
 handlers: ./src/handlers
+# Robinhood Chain is an L2 without practical reorgs; skipping rollback history speeds the historical sync and
+# keeps envio_history_* tables empty (the self-hosted database is small, docs/DEPLOY.md).
+rollback_on_reorg: false
 contracts:
   - name: PonsV2Factory
     events:

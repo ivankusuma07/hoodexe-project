@@ -2,8 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { parseEther, type Address } from 'viem';
 import { NATIVE_PAIR, buildDescription } from '@hood/shared';
 import { schema } from './db';
-import { costLedger } from './routes/portfolio';
-import type { EnvioClient, WalletTrade } from './services/envio';
+import type { EnvioClient, WalletPosition } from './services/envio';
 import { alice, bob, setup } from './test/helpers';
 
 type Ctx = Awaited<ReturnType<typeof setup>>;
@@ -18,21 +17,18 @@ const addr = (n: number) => `0x${n.toString(16).padStart(40, '0')}` as Address;
 const STATEMENT = '$e^{i\\pi} + 1 = 0$';
 const M = 10n ** 18n;
 
-const buy = (token: Address, tokens: bigint, quote: bigint, recipient: Address = alice.address, trader: Address = recipient): WalletTrade => ({
-  token: token.toLowerCase(),
-  trader: trader.toLowerCase(),
-  recipient: recipient.toLowerCase(),
-  isBuy: true,
-  quoteAmount: quote,
-  tokenAmount: tokens,
-});
-const sell = (token: Address, tokens: bigint, quote: bigint, trader: Address = alice.address): WalletTrade => ({
-  ...buy(token, tokens, quote, trader),
-  isBuy: false,
-});
+/** An open position as the indexer keeps it (average cost, already net of sells). */
+const pos = (token: Address, qty: bigint, cost: bigint): WalletPosition => ({ token, qty, cost });
 
-async function seed(trades: WalletTrade[] | null) {
-  const envio = trades ? ({ walletTrades: async () => trades } as unknown as EnvioClient) : undefined;
+async function seed(positions: WalletPosition[] | null, opts: { failing?: boolean } = {}) {
+  const envio = positions
+    ? ({
+        walletPositions: async () => {
+          if (opts.failing) throw new Error('Envio GraphQL answered 503');
+          return positions;
+        },
+      } as unknown as EnvioClient)
+    : undefined;
   ctx = await setup({ envio });
   // A: alice's own launch, in the token table.
   await ctx!.db.insert(schema.tokens).values({
@@ -69,39 +65,15 @@ async function seed(trades: WalletTrade[] | null) {
 
 const get = (wallet: string) => ctx!.app.inject({ method: 'GET', url: `/portfolio/${wallet}` });
 
-describe('costLedger', () => {
-  it('averages cost over buys and releases it pro rata on sells', () => {
-    const l = costLedger(alice.address, [
-      buy(addr(1), 2_000n, 200n),
-      buy(addr(1), 2_000n, 600n),
-      sell(addr(1), 1_000n, 999n), // avg 0.2/token: releases 200
-      sell(addr(2), 50n, 5n), // nothing bought before: ignored
-    ]);
-    expect(l.get(addr(1))).toEqual({ qty: 3_000n, cost: 600n });
-    expect(l.get(addr(2))).toEqual({ qty: 0n, cost: 0n });
-  });
-
-  it('counts buys sent to the wallet, not ones it paid for someone else', () => {
-    const l = costLedger(alice.address, [buy(addr(1), 100n, 10n, alice.address, bob.address), buy(addr(1), 100n, 10n, bob.address, alice.address)]);
-    expect(l.get(addr(1))).toEqual({ qty: 100n, cost: 10n });
-  });
-
-  it('never sells more than it holds', () => {
-    const l = costLedger(alice.address, [buy(addr(1), 100n, 10n), sell(addr(1), 150n, 20n)]);
-    expect(l.get(addr(1))).toEqual({ qty: 0n, cost: 0n });
-  });
-});
-
 // Each test boots its own PGlite (the indexer on or off), which is slow under a full parallel run.
 describe('GET /portfolio/:wallet', { timeout: 30_000 }, () => {
   it('lists holdings with value and cost basis, and the wallet’s launches', async () => {
     await seed([
-      buy(addr(1), 2_000_000n * M, parseEther('0.02')),
-      sell(addr(1), 1_000_000n * M, parseEther('0.015')),
-      buy(addr(2), 1_000n * M, 5_000_000n, alice.address, bob.address), // bob bought for alice
-      buy(addr(3), 5n * M, parseEther('0.1')),
-      buy(addr(4), 7n * M, 1n),
-      buy(addr(5), 9n * M, parseEther('1')),
+      pos(addr(1), 1_000_000n * M, parseEther('0.01')), // 2M bought for 0.02, half sold
+      pos(addr(2), 1_000n * M, 5_000_000n), // a dev buy the router made for alice
+      pos(addr(3), 5n * M, parseEther('0.1')),
+      pos(addr(4), 7n * M, 1n),
+      pos(addr(5), 9n * M, parseEther('1')),
     ]);
     const res = await get(alice.address.toLowerCase());
     expect(res.statusCode).toBe(200);
@@ -127,11 +99,20 @@ describe('GET /portfolio/:wallet', { timeout: 30_000 }, () => {
     expect(by.CCC).toMatchObject({ phase: 2, value: null, price: null, pnl: null, costBasis: 0.1 });
   });
 
-  it('leaves cost unknown when the wallet holds more than its trades explain', async () => {
-    await seed([buy(addr(1), 10n * M, parseEther('0.01'))]);
+  it('leaves cost unknown when the wallet holds more than its position explains', async () => {
+    await seed([pos(addr(1), 10n * M, parseEther('0.01'))]);
     const [a] = (await get(alice.address)).json().holdings;
     expect(a).toMatchObject({ symbol: 'AAA', costBasis: null, pnl: null, pnlPct: null });
     expect(a.value).toBeCloseTo(0.0025, 12);
+  });
+
+  it('still lists holdings, without cost basis, when the indexer fails', async () => {
+    await seed([pos(addr(1), 1_000_000n * M, parseEther('0.01'))], { failing: true });
+    const res = await get(alice.address);
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.tradeHistory).toBe(false);
+    expect(body.holdings.map((h: { symbol: string; costBasis: number | null }) => [h.symbol, h.costBasis])).toEqual([['AAA', null]]);
   });
 
   it('falls back to the wallet’s own launches without the indexer', async () => {

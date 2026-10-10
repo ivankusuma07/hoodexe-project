@@ -1,42 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import { desc, inArray, sql } from 'drizzle-orm';
-import { formatUnits, getAddress, isAddress, isAddressEqual, type Address } from 'viem';
+import { formatUnits, getAddress, isAddress, type Address } from 'viem';
 import { findPair, parseDescription } from '@hood/shared';
 import { HttpError } from '../app';
 import { schema } from '../db';
-import type { WalletTrade } from '../services/envio';
+import type { WalletPosition } from '../services/envio';
 import { storedScore } from './score';
 import { toItem } from './tokens';
 
 const CACHE_MS = 15_000;
 /** Enough for any real wallet; keeps one request bounded. */
 const MAX_COINS = 200;
-
-export type Ledger = { qty: bigint; cost: bigint };
-
-/**
- * Average-cost ledger per token (lowercase address), from the wallet's curve trades in chain order.
- * Buys into the wallet add their gross spend (fees included); the wallet's sells remove cost in
- * proportion to the tokens sold. Buys paid for someone else and quote received from others' sells
- * don't touch the wallet's tokens.
- */
-export function costLedger(wallet: Address, trades: WalletTrade[]): Map<string, Ledger> {
-  const out = new Map<string, Ledger>();
-  for (const t of trades) {
-    const key = t.token.toLowerCase();
-    const l = out.get(key) ?? { qty: 0n, cost: 0n };
-    if (t.isBuy && isAddressEqual(t.recipient as Address, wallet)) {
-      l.qty += t.tokenAmount;
-      l.cost += t.quoteAmount;
-    } else if (!t.isBuy && isAddressEqual(t.trader as Address, wallet) && l.qty > 0n) {
-      const sold = t.tokenAmount < l.qty ? t.tokenAmount : l.qty;
-      l.cost -= (l.cost * sold) / l.qty;
-      l.qty -= sold;
-    }
-    out.set(key, l);
-  }
-  return out;
-}
 
 const units = (raw: bigint | null, decimals: number) => (raw == null ? null : Number(formatUnits(raw, decimals)));
 
@@ -58,20 +32,20 @@ export async function portfolioRoutes(app: FastifyInstance) {
       .orderBy(desc(schema.tokens.blockNumber))
       .limit(MAX_COINS);
 
-    // Coins the wallet traded (indexer) plus the ones it launched; balances decide what it holds.
-    // Without trade history (no indexer, or it failed) holdings still come from balances, just without cost basis.
+    // Coins the wallet has a position in (indexer) plus the ones it launched; balances decide what it holds.
+    // Without positions (no indexer, or it failed) holdings still come from balances, just without cost basis.
     let tradeHistory = envio != null;
-    let trades: WalletTrade[] = [];
+    let positions: WalletPosition[] = [];
     if (envio) {
       try {
-        trades = await envio.walletTrades(wallet);
+        positions = await envio.walletPositions(wallet);
       } catch (e) {
-        req.log.warn(`portfolio trade history failed: ${e instanceof Error ? e.message : String(e)}`);
+        req.log.warn(`portfolio positions failed: ${e instanceof Error ? e.message : String(e)}`);
         tradeHistory = false;
       }
     }
-    const ledger = costLedger(wallet, trades);
-    const candidates = [...new Set([...launched.map((r) => r.tokenAddress), ...trades.map((t) => t.token)].map((a) => getAddress(a)))].slice(0, MAX_COINS);
+    const ledger = new Map(positions.map((pos) => [pos.token.toLowerCase(), pos]));
+    const candidates = [...new Set([...launched.map((r) => r.tokenAddress), ...positions.map((pos) => pos.token)].map((a) => getAddress(a)))].slice(0, MAX_COINS);
     const balances = candidates.length ? await chain.tokenBalances(wallet, candidates) : new Map<Address, bigint>();
     const held = candidates.filter((t) => (balances.get(t) ?? 0n) > 0n);
 

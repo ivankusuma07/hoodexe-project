@@ -89,6 +89,22 @@ async function recordTrade(event: TradeEvent, context: EvmOnEventContext, t: Tra
     lastTradeAt: ts,
   });
 
+  // Positions: buys go to whoever received the tokens, sells come out of the seller's position.
+  if (t.isBuy) {
+    const id = `${t.recipient}-${token.id}`;
+    const p = await context.Position.get(id);
+    context.Position.set({ id, wallet: t.recipient, token: token.id, qty: (p?.qty ?? 0n) + t.tokens, cost: (p?.cost ?? 0n) + t.quote });
+  } else {
+    const id = `${t.trader}-${token.id}`;
+    const p = await context.Position.get(id);
+    if (p && p.qty > 0n) {
+      const sold = t.tokens < p.qty ? t.tokens : p.qty;
+      const qty = p.qty - sold;
+      if (qty === 0n) context.Position.deleteUnsafe(id);
+      else context.Position.set({ ...p, qty, cost: p.cost - (p.cost * sold) / p.qty });
+    }
+  }
+
   for (const interval of INTERVALS) {
     const bucketStart = ts - (ts % interval);
     const id = `${token.id}-${interval}-${bucketStart}`;

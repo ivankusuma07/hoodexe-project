@@ -48,6 +48,8 @@ const envSchema = z
     STAND_INS: z.enum(['refuse', 'allow']).default('refuse'),
     /** Shared with the web app (its PROXY_SECRET): proves an x-hood-client-ip header came through its /api proxy. */
     PROXY_SECRET: optional,
+    /** The self-hosted indexer's own Postgres; the worker prunes old trades and candles there (docs/DEPLOY.md). */
+    INDEXER_DATABASE_URL: optional,
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;

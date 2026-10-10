@@ -4,6 +4,7 @@ import { loadEnv } from './env';
 import { envioClient } from './services/envio';
 import { redisPubSub } from './services/pubsub';
 import { systemCalloutsTick } from './systemCallouts';
+import { pruneIndexer } from './services/indexerPrune';
 
 /**
  * The always-on worker (docs/BRIEF.md §9): every 10 s, system callouts for hood.exe coins. Runs from the
@@ -37,10 +38,37 @@ await tick();
 const timer = setInterval(tick, 10_000);
 log('running every 10 s');
 
+// Hourly: keep the self-hosted indexer's database inside its volume (services/indexerPrune.ts).
+let pruneTimer: ReturnType<typeof setInterval> | undefined;
+let closeIndexerDb = async () => {};
+if (env.INDEXER_DATABASE_URL) {
+  const { default: postgres } = await import('postgres');
+  const indexerSql = postgres(env.INDEXER_DATABASE_URL, { max: 2, onnotice: () => {} });
+  closeIndexerDb = () => indexerSql.end({ timeout: 5 });
+  let pruning = false;
+  const prune = async () => {
+    if (pruning) return;
+    pruning = true;
+    try {
+      const started = Date.now();
+      const res = await pruneIndexer(async (text, params) => (await indexerSql.unsafe(text, params as never[])).count, Math.floor(Date.now() / 1_000));
+      log(`pruned indexer: ${res.trades} trades, ${res.candles} candles in ${Math.round((Date.now() - started) / 1_000)} s`);
+    } catch (e) {
+      log(`indexer prune failed: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+    } finally {
+      pruning = false;
+    }
+  };
+  setTimeout(() => void prune(), 60_000);
+  pruneTimer = setInterval(() => void prune(), 3_600_000);
+  log('pruning the indexer database hourly');
+}
+
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {
     clearInterval(timer);
-    await Promise.all([pubsub.close(), close()]);
+    if (pruneTimer) clearInterval(pruneTimer);
+    await Promise.all([pubsub.close(), close(), closeIndexerDb()]);
     await redis.quit();
     process.exit(0);
   });

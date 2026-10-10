@@ -30,11 +30,12 @@ type Curve {
   token: String!
 }
 
+"Recent trades only: the worker prunes rows older than 7 days (Railway Hobby storage). Use Position for wallets."
 type Trade {
   id: ID!
   token: String! @index
-  trader: String! @index
-  recipient: String! @index
+  trader: String!
+  recipient: String!
   isBuy: Boolean!
   "Gross quote: what a buyer spent, or what a sale took off the curve before fees."
   quoteAmount: BigInt!
@@ -44,11 +45,12 @@ type Trade {
   "Execution price before fees: net quote into (or gross out of) the curve per token."
   price: BigDecimal!
   blockNumber: Int! @index
-  timestamp: Int!
+  "Indexed for the worker's 7-day pruning."
+  timestamp: Int! @index
   txHash: String!
 }
 
-"OHLC of trade prices per token and interval (60, 300, 3600, 86400 s)."
+"OHLC of trade prices per token and interval (60, 300, 3600, 86400 s). The worker prunes old 1m, 5m and 1h candles."
 type Candle {
   id: ID!
   token: String! @index
@@ -60,6 +62,21 @@ type Candle {
   close: BigDecimal!
   volumeQuote: BigInt!
   trades: Int!
+}
+
+"""
+A wallet's open position in one coin, from its curve trades: average-cost basis (Portfolio P&L). Buys count
+for the recipient (so a creator's dev buy through the router counts), sells for the seller. Deleted once the
+position is sold out. Tokens moved by plain transfers aren't seen.
+"""
+type Position {
+  id: ID!
+  wallet: String! @index
+  token: String!
+  "Tokens bought on the curve and not yet sold (18 decimals)."
+  qty: BigInt!
+  "Quote spent on those tokens, fees included, in the pair token's decimals."
+  cost: BigInt!
 }
 
 type Graduation {

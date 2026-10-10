@@ -83,6 +83,30 @@ describe('Pons V2 handlers', () => {
     t.expect(second).toMatchObject({ isBuy: false, quoteAmount: (99n * E18) / 1000n });
   });
 
+  it('keeps average-cost positions: router buys count for the recipient, a full sell removes it', async (t) => {
+    const ROUTER = '0x00000000000000000000000000000000000000F1';
+    const routerBuy = { ...buy(1, T0 + 5, E18, 1_000n * E18, 0n, 0n), params: { buyer: ROUTER, recipient: TRADER, quoteIn: E18, tokensOut: 1_000n * E18, fee: 0n, tax: 0n } };
+    const indexer = createTestIndexer();
+    await indexer.process({
+      chains: {
+        [CHAIN]: {
+          simulate: [
+            launch,
+            routerBuy, // 1000 tokens for 1 ETH, bought by the router for TRADER
+            buy(2, T0 + 6, 3n * E18, 1_000n * E18, 0n, 0n), // 1000 more for 3 ETH: avg 0.002 ETH/token
+            sell(3, T0 + 7, 500n * E18, E18, 0n, 0n), // sells a quarter: releases 1 ETH of cost
+          ],
+        },
+      },
+    });
+    const p = await indexer.Position.getOrThrow(`${TRADER}-${TOKEN}`);
+    t.expect(p).toMatchObject({ wallet: TRADER, token: TOKEN, qty: 1_500n * E18, cost: 3n * E18 });
+    t.expect(await indexer.Position.get(`${ROUTER}-${TOKEN}`)).toBeUndefined();
+
+    await indexer.process({ chains: { [CHAIN]: { simulate: [sell(4, T0 + 8, 2_000n * E18, E18, 0n, 0n)] } } });
+    t.expect(await indexer.Position.get(`${TRADER}-${TOKEN}`)).toBeUndefined();
+  });
+
   it('builds 1m/5m/1h/1d candles with OHLC and volume', async (t) => {
     const indexer = createTestIndexer();
     const at = T0 - (T0 % 3_600) + 10; // 10 s into an hour, so every interval's bucket is predictable

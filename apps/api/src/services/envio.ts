@@ -199,25 +199,22 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000, limits: Partia
     },
 
     /**
-     * The wallet's own curve trades, oldest first (portfolio cost basis). Filtered on the indexed `trader` column:
-     * matching `recipient` too (a creator's dev buy, made by the launch-and-buy router) scans every trade on the
-     * hosted indexer and times out. Those holdings show an unknown cost basis until the indexer is redeployed with
-     * the `recipient` index (apps/indexer/schema.graphql) and this filter adds it back.
+     * The wallet's open positions (indexer `Position`: average-cost quantity and cost per coin, from its curve
+     * trades, including dev buys the router made for it). Portfolio's cost basis.
      */
-    async walletTrades(wallet: string, max = 5_000): Promise<WalletTrade[]> {
-      const rows = await all(
-        `query WalletTrades($wallet: String!, $limit: Int!, $offset: Int!) {
-          Trade(where: { trader: { _eq: $wallet } }, order_by: [{ blockNumber: asc }, { id: asc }], limit: $limit, offset: $offset) {
-            token trader recipient isBuy quoteAmount tokenAmount
+    async walletPositions(wallet: string, max = 2_000): Promise<WalletPosition[]> {
+      return all(
+        `query WalletPositions($wallet: String!, $limit: Int!, $offset: Int!) {
+          Position(where: { wallet: { _eq: $wallet } }, order_by: { id: asc }, limit: $limit, offset: $offset) {
+            token qty cost
           }
         }`,
         { wallet },
-        z.array(z.object({ token: z.string(), trader: z.string(), recipient: z.string(), isBuy: z.boolean(), quoteAmount: big, tokenAmount: big })),
-        'Trade',
+        z.array(z.object({ token: z.string(), qty: big, cost: big })),
+        'Position',
         'interactive',
         max,
       );
-      return rows;
     },
 
     /** Newest `limit` trades, newest first. */
@@ -251,4 +248,4 @@ export function envioLaunchSource(envio: EnvioClient, rpc: LaunchSource): Launch
   };
 }
 
-export type WalletTrade = { token: string; trader: string; recipient: string; isBuy: boolean; quoteAmount: bigint; tokenAmount: bigint };
+export type WalletPosition = { token: string; qty: bigint; cost: bigint };
