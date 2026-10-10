@@ -13,7 +13,7 @@ import { systemCalloutsTick } from './systemCallouts';
 const env = loadEnv();
 if (!env.REDIS_URL) throw new Error('The worker needs REDIS_URL to reach the API.');
 const { db, close } = await connectPostgres(env.DATABASE_URL);
-const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2 });
+const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2, family: 0 });
 const pubsub = redisPubSub(redis);
 const envio = env.ENVIO_GRAPHQL_URL ? envioClient(env.ENVIO_GRAPHQL_URL) : undefined;
 if (!envio) console.warn('No ENVIO_GRAPHQL_URL: big-buy callouts are off; launches and graduations still post.');

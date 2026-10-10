@@ -13,7 +13,8 @@ import { rpcLaunchSource, tokenIndex } from './services/tokenIndex';
 
 const env = loadEnv();
 const { db, close: closeDb } = await connectPostgres(env.DATABASE_URL);
-const redis = env.REDIS_URL ? new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2 }) : null;
+// family 0: Railway private hostnames may resolve to IPv6 only.
+const redis = env.REDIS_URL ? new Redis(env.REDIS_URL, { maxRetriesPerRequest: 2, family: 0 }) : null;
 const kv = redis ? redisKv(redis) : memoryKv();
 const pubsub = redis ? redisPubSub(redis) : memoryPubSub();
 const deepseek = env.DEEPSEEK_API_KEY ? { apiKey: env.DEEPSEEK_API_KEY, baseURL: env.DEEPSEEK_BASE_URL, model: env.DEEPSEEK_MODEL, log: (m: string) => console.warn(m) } : null;

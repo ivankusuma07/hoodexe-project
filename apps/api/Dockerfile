@@ -20,5 +20,6 @@ ENV NODE_ENV=production
 WORKDIR /repo/apps/api
 USER node
 EXPOSE 8787
-# Railway sets PORT. The worker service overrides the command (railway.worker.json).
-CMD ["node_modules/.bin/tsx", "src/index.ts"]
+# Railway sets PORT. HOOD_PROCESS=worker runs the worker from the same image (or railway.worker.json's command).
+ENV HOOD_PROCESS=index
+CMD ["sh", "-c", "exec node_modules/.bin/tsx src/$HOOD_PROCESS.ts"]
