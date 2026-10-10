@@ -34,7 +34,7 @@ type Trade {
   id: ID!
   token: String! @index
   trader: String! @index
-  recipient: String!
+  recipient: String! @index
   isBuy: Boolean!
   "Gross quote: what a buyer spent, or what a sale took off the curve before fees."
   quoteAmount: BigInt!

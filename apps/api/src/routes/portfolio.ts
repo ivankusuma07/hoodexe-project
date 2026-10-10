@@ -59,7 +59,17 @@ export async function portfolioRoutes(app: FastifyInstance) {
       .limit(MAX_COINS);
 
     // Coins the wallet traded (indexer) plus the ones it launched; balances decide what it holds.
-    const trades = envio ? await envio.walletTrades(wallet) : [];
+    // Without trade history (no indexer, or it failed) holdings still come from balances, just without cost basis.
+    let tradeHistory = envio != null;
+    let trades: WalletTrade[] = [];
+    if (envio) {
+      try {
+        trades = await envio.walletTrades(wallet);
+      } catch (e) {
+        req.log.warn(`portfolio trade history failed: ${e instanceof Error ? e.message : String(e)}`);
+        tradeHistory = false;
+      }
+    }
     const ledger = costLedger(wallet, trades);
     const candidates = [...new Set([...launched.map((r) => r.tokenAddress), ...trades.map((t) => t.token)].map((a) => getAddress(a)))].slice(0, MAX_COINS);
     const balances = candidates.length ? await chain.tokenBalances(wallet, candidates) : new Map<Address, bigint>();
@@ -134,7 +144,7 @@ export async function portfolioRoutes(app: FastifyInstance) {
       holdings,
       launches: launched.map(toItem),
       /** False without the indexer: holdings then only cover the wallet's own launches, with no cost basis. */
-      tradeHistory: envio != null,
+      tradeHistory,
     };
     cache.set(wallet, { at: Date.now(), body });
     if (cache.size > 2_000) cache.delete(cache.keys().next().value!);

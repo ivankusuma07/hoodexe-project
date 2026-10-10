@@ -102,13 +102,14 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000, limits: Partia
   }
 
   /** Runs a paged query (it must take $limit and $offset) until a short page; `field` names the rows. */
-  async function all<T>(text: string, variables: Record<string, unknown>, schema: z.ZodType<T[]>, field: string, which: Lane = 'background'): Promise<T[]> {
+  async function all<T>(text: string, variables: Record<string, unknown>, schema: z.ZodType<T[]>, field: string, which: Lane = 'background', max = Infinity): Promise<T[]> {
     const out: T[] = [];
-    for (let offset = 0; ; offset += pageSize) {
+    for (let offset = 0; offset < max; offset += pageSize) {
       const page = await query(text, { ...variables, limit: pageSize, offset }, z.object({ [field]: schema }).transform((d) => d[field] as T[]), which);
       out.push(...page);
       if (page.length < pageSize) return out;
     }
+    return out.slice(0, max);
   }
 
   return {
@@ -197,11 +198,16 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000, limits: Partia
       return data.Trade;
     },
 
-    /** Every curve trade where `wallet` bought, sold or received, oldest first (portfolio cost basis). */
+    /**
+     * The wallet's own curve trades, oldest first (portfolio cost basis). Filtered on the indexed `trader` column:
+     * matching `recipient` too (a creator's dev buy, made by the launch-and-buy router) scans every trade on the
+     * hosted indexer and times out. Those holdings show an unknown cost basis until the indexer is redeployed with
+     * the `recipient` index (apps/indexer/schema.graphql) and this filter adds it back.
+     */
     async walletTrades(wallet: string, max = 5_000): Promise<WalletTrade[]> {
       const rows = await all(
         `query WalletTrades($wallet: String!, $limit: Int!, $offset: Int!) {
-          Trade(where: { _or: [{ trader: { _eq: $wallet } }, { recipient: { _eq: $wallet } }] }, order_by: [{ blockNumber: asc }, { id: asc }], limit: $limit, offset: $offset) {
+          Trade(where: { trader: { _eq: $wallet } }, order_by: [{ blockNumber: asc }, { id: asc }], limit: $limit, offset: $offset) {
             token trader recipient isBuy quoteAmount tokenAmount
           }
         }`,
@@ -209,8 +215,9 @@ export function envioClient(graphqlUrl: string, pageSize = 1_000, limits: Partia
         z.array(z.object({ token: z.string(), trader: z.string(), recipient: z.string(), isBuy: z.boolean(), quoteAmount: big, tokenAmount: big })),
         'Trade',
         'interactive',
+        max,
       );
-      return rows.slice(0, max);
+      return rows;
     },
 
     /** Newest `limit` trades, newest first. */
