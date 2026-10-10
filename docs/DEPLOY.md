@@ -59,9 +59,11 @@ down past 100k events), so the indexer runs on Railway as three services in the 
   of every trade, and the worker (`INDEXER_DATABASE_URL` = the indexer's Postgres) prunes trades after 7 days and
   1m/5m/1h candles after 1/3/10 days, hourly. Expect a steady state of 2–3 GB.
 - **Sync speed:** curve trades are matched by event signature (wildcard), so a free HyperSync token (5 requests a
-  minute) works. `config.selfhost.yaml` starts on 3 Oct 2026 (block 79,050,000), which synced in about an hour;
-  Portfolio cost basis covers buys from then on. `config.yaml` (from the factory's deployment) would take most of
-  a day on the free token.
+  minute) works. `config.selfhost.yaml` starts on 3 Oct 2026 (block 79,050,000), which synced in about 25 minutes;
+  Portfolio cost basis covers buys from then on. Coins launched earlier are found through
+  `apps/indexer/seeds/pre-start-launches.csv.gz` (the 18k non-graduated ones traded since 3 Oct, exported from the
+  full Envio Cloud index); an older coin outside that list that starts trading again isn't picked up.
+  `config.yaml` (from the factory's deployment) would take most of a day on the free token.
 - Deploy with `npx @railway/cli up --service indexer`. It resumes from the database; never run `envio start --restart`
   there, which wipes the index.
 
