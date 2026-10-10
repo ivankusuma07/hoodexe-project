@@ -38,6 +38,8 @@ export function startAnalytics() {
       persistence: 'memory',
       person_profiles: 'never',
       autocapture: false,
+      capture_dead_clicks: false,
+      enable_heatmaps: false,
       capture_pageview: 'history_change',
       capture_pageleave: false,
       disable_session_recording: true,
