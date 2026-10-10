@@ -7,6 +7,7 @@ import { Button } from '@/components/xp/Button';
 import { ConnectWallet } from '@/components/xp/ConnectWallet';
 import { Dialog } from '@/components/xp/Dialog';
 import { ApiError, fetchCallouts, fetchSession, postCallout, reactToCallout, setNickname, type Callout, type CalloutPage, type ReactionKind } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { useIdentity } from '@/lib/identity';
 import { onLive, startLive } from '@/lib/live';
 import { ensureSession } from '@/lib/siwe';
@@ -155,6 +156,7 @@ function Compose({ token, ticker, onPosted, onError }: { token?: string; ticker?
       await ensureSession(address as Address);
       const r = await postCallout(text, token);
       onPosted(r.callout, r.hidden);
+      track('callout_posted', { hidden: r.hidden, with_ticker: token != null });
       setText(ticker ? `$${ticker} ` : '');
       void session.refetch();
     } catch (e) {

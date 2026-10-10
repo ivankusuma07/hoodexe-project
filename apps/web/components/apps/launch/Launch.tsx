@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Hash } from 'viem';
-import { addressUrl, formatAmount, normalizeStatement, txUrl, type RigorScore } from '@hood/shared';
+import { addressUrl, findPair, formatAmount, normalizeStatement, txUrl, type RigorScore } from '@hood/shared';
 import { Button } from '@/components/xp/Button';
 import { ProgressBar } from '@/components/xp/Controls';
 import { Dialog, MessageBox } from '@/components/xp/Dialog';
 import { LaunchIcon } from '@/components/xp/Icons';
 import { latexErrors } from '@/components/xp/Latex';
+import { failureReason, track } from '@/lib/analytics';
 import { ApiError, scoreTheorem } from '@/lib/api';
 import { useIdentity } from '@/lib/identity';
 import { openApp } from '@/lib/openApp';
@@ -101,6 +102,7 @@ export function Launch({ win }: { win: WindowState }) {
     try {
       const result = await scoreTheorem(d.name.trim(), statement);
       setDraft((cur) => ({ ...cur, rigor: { statement, result } }));
+      track('theorem_scored', { score: result.score, cached: result.cached });
     } catch (e) {
       setDraft((cur) => ({ ...cur, rigor: { statement, result: FAILED_SCORE } }));
       setScoreError(e instanceof ApiError ? e.message : 'Scoring failed.');
@@ -117,6 +119,7 @@ export function Launch({ win }: { win: WindowState }) {
   };
 
   const back = () => setPageIndex((i) => Math.max(0, i - 1));
+  useEffect(() => track('launch_step_viewed', { step: page }), [page]);
   const close = () => useWindows.getState().close(win.id);
 
   const quoteIn = terms ? devBuyAmount(draft, terms.decimals) : null;
@@ -125,6 +128,8 @@ export function Launch({ win }: { win: WindowState }) {
 
   const runDeploy = async () => {
     if (!terms) return;
+    const props = { pair: findPair(draft.pair)?.symbol ?? 'other', dev_buy: quoteIn != null && quoteIn > 0n };
+    track('launch_submitted', props);
     setDeploy({ state: 'running', step: 'signin', done: [] });
     try {
       const result = await deployLaunch(draft, terms, (step, hash) =>
@@ -135,8 +140,11 @@ export function Launch({ win }: { win: WindowState }) {
         }),
       );
       setDeploy({ state: 'done', result });
+      track('launch_confirmed', props);
     } catch (e) {
-      setDeploy({ state: 'error', message: e instanceof ApiError ? e.message : txErrorMessage(e) });
+      const message = e instanceof ApiError ? e.message : txErrorMessage(e);
+      setDeploy({ state: 'error', message });
+      track('launch_failed', { ...props, reason: failureReason(message) });
     }
   };
 

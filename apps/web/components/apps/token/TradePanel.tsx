@@ -8,6 +8,7 @@ import { addressUrl, buyPresets, findPair, formatAmount, formatBps, ponsCurveAbi
 import { Button } from '@/components/xp/Button';
 import { ConnectWallet } from '@/components/xp/ConnectWallet';
 import { InfoIcon, WarningIcon } from '@/components/xp/Icons';
+import { failureReason, track } from '@/lib/analytics';
 import type { TokenDetail } from '@/lib/api';
 import { useIdentity } from '@/lib/identity';
 import { useLiveCurve, useTradeBalances } from '@/lib/pons/curve';
@@ -96,6 +97,8 @@ export function TradePanel({ token: t, paused = false }: { token: TokenDetail; p
 
   const execute = async () => {
     if (!account || !amountIn) return;
+    const props = { side, pair: t.pair.symbol, hood: t.hood, approval: needsApproval };
+    track('trade_submitted', props);
     try {
       if (getAccount(wagmiConfig).chainId !== chain.id) await switchChain(wagmiConfig, { chainId: chain.id });
       if (needsApproval) {
@@ -142,12 +145,15 @@ export function TradePanel({ token: t, paused = false }: { token: TokenDetail; p
           ? `Bought ${formatAmount(parseEventLogs({ abi: ponsCurveAbi, eventName: 'CurveBuy', logs })[0]?.args.tokensOut ?? 0n, 18, { compact: true })} $${t.symbol}.`
           : `Sold for ${formatAmount(parseEventLogs({ abi: ponsCurveAbi, eventName: 'CurveSell', logs })[0]?.args.quoteOut ?? 0n, t.pair.decimals)} ${t.pair.symbol}.`;
       setStatus({ kind: 'done', text, hash });
+      track('trade_confirmed', props);
       setAmount('');
       await Promise.all([balances.refetch(), live.refetch()]);
       void queryClient.invalidateQueries({ queryKey: ['token', t.token.toLowerCase()] });
       void queryClient.invalidateQueries({ queryKey: ['trades', t.token.toLowerCase()] });
     } catch (e) {
-      setStatus({ kind: 'error', text: txErrorMessage(e) });
+      const text = txErrorMessage(e);
+      setStatus({ kind: 'error', text });
+      track('trade_failed', { ...props, reason: failureReason(text) });
     }
   };
 

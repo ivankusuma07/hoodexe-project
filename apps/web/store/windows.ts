@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AppId } from '@/components/apps/meta';
+import { track } from '@/lib/analytics';
 
 export type WindowState = {
   id: string;
@@ -78,6 +79,7 @@ export const useWindows = create<WindowStore>((set, get) => ({
       return id;
     }
 
+    track('app_opened', { app: appId });
     const { vw, vh } = viewport();
     const width = Math.min(w, vw - 8);
     const height = Math.min(h, vh - 8);

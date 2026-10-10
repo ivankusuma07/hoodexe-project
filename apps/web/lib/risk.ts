@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { track } from './analytics';
 
 /** Bump the version when the risk disclosure changes materially, so everyone accepts it again. */
 const KEY = 'hood.riskAccepted.v1';
@@ -31,6 +32,7 @@ export const useRisk = create<RiskStore>((set, get) => ({
     }
     const run = get().pending;
     set({ accepted: true, pending: null });
+    track('risk_accepted');
     run?.();
   },
   dismiss: () => set({ pending: null }),

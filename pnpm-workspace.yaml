@@ -4,6 +4,7 @@ packages:
 
 allowBuilds:
   bufferutil: false
+  core-js: false
   esbuild: false
   keccak: false
   sharp: false

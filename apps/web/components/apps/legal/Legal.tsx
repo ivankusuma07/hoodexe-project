@@ -183,7 +183,9 @@ export function Privacy({ win }: { win: WindowState }) {
           security and debugging.
         </li>
         <li>
-          <b>Usage analytics:</b> if enabled, PostHog records which windows and features are used, with a pseudonymous ID, to improve hood.exe.
+          <b>Usage analytics:</b> PostHog records which windows and features are used, whether launches and trades succeed,
+          errors and page speed, under an anonymous ID that lasts only for your visit. It never receives your wallet address
+          or anything you type, and doesn&apos;t record your screen.
         </li>
         <li>
           <b>In your browser:</b> local storage remembers preferences such as tray balloons, your wallet connection and that you accepted the risk
