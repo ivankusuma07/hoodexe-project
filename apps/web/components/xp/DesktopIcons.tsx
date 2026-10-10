@@ -47,7 +47,7 @@ export function DesktopIcons({ selected, onSelect }: { selected: AppId | null; o
               aria-label={`${app.label} — double-click to open`}
             >
               <span className={styles.iconImg}>
-                <app.Icon size={32} />
+                <app.Icon size={48} />
               </span>
               <span className={styles.label}>{app.label}</span>
             </button>

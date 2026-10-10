@@ -19,33 +19,33 @@
   bottom: 8px;
   display: grid;
   grid-auto-flow: column;
-  grid-template-rows: repeat(auto-fill, 80px);
-  grid-auto-columns: 76px;
-  gap: 4px 6px;
+  grid-template-rows: repeat(auto-fill, 100px);
+  grid-auto-columns: 96px;
+  gap: 6px 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .icon {
-  width: 76px;
-  height: 80px;
-  padding: 3px 2px;
+  width: 96px;
+  height: 100px;
+  padding: 4px 2px;
   border: 0;
   background: none;
   font: inherit;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   color: #fff;
 }
 .icon:focus { outline: none; }
 
 .iconImg {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   filter: drop-shadow(1px 2px 1px rgba(0, 0, 0, 0.35));
 }
 .selected .iconImg::after {
@@ -57,11 +57,13 @@
   mix-blend-mode: multiply;
 }
 
+.iconImg svg { width: 48px; height: 48px; }
+
 .label {
-  max-width: 74px;
+  max-width: 92px;
   padding: 0 2px 1px;
-  font-size: 11px;
-  line-height: 13px;
+  font-size: 12px;
+  line-height: 14px;
   text-align: center;
   text-shadow: 1px 1px 1px #000, 0 0 2px rgba(0, 0, 0, 0.5);
   overflow-wrap: anywhere;
@@ -79,12 +81,12 @@
     grid-auto-flow: row;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: none;
-    grid-auto-rows: 88px;
+    grid-auto-rows: 100px;
     justify-items: center;
     overflow-y: auto;
   }
-  .icon { width: 88px; height: 88px; }
-  .iconImg { width: 48px; height: 48px; }
-  .iconImg svg { width: 48px; height: 48px; }
-  .label { font-size: 12px; line-height: 14px; max-width: 86px; }
+  .icon { width: 96px; height: 100px; }
+  .iconImg { width: 56px; height: 56px; }
+  .iconImg svg { width: 56px; height: 56px; }
+  .label { font-size: 13px; line-height: 15px; max-width: 94px; }
 }
