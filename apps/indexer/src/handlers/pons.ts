@@ -3,11 +3,6 @@ import { BigDecimal, indexer, type EvmOnEventContext } from 'envio';
 /** Candle intervals in seconds: 1m, 5m, 1h, 1d (docs/BRIEF.md §9). */
 export const INTERVALS = [60, 300, 3_600, 86_400] as const;
 
-// Every launch deploys its own curve; trades are only seen once the curve is registered here.
-indexer.contractRegister({ contract: 'PonsV2Factory', event: 'TokenLaunched' }, async ({ event, context }) => {
-  context.chain.PonsV2Curve.add(event.params.curve);
-});
-
 indexer.onEvent({ contract: 'PonsV2Factory', event: 'TokenLaunched' }, async ({ event, context }) => {
   const { token, curve, deployer, pairToken, launchConfigId, graduationThreshold } = event.params;
   context.Token.set({
@@ -124,13 +119,18 @@ async function recordTrade(event: TradeEvent, context: EvmOnEventContext, t: Tra
   }
 }
 
-indexer.onEvent({ contract: 'PonsV2Curve', event: 'CurveBuy' }, async ({ event, context }) => {
+/**
+ * Every launch deploys its own curve (400k+ by Oct 2026). Registering each as a contract splits HyperSync
+ * queries per address batch, which a rate-limited token can't keep up with, so curve events are matched by
+ * signature across the chain (wildcard) and recordTrade keeps only those from curves in the Curve table.
+ */
+indexer.onEvent({ contract: 'PonsV2Curve', event: 'CurveBuy', wildcard: true }, async ({ event, context }) => {
   const { buyer, recipient, quoteIn, tokensOut, fee, tax } = event.params;
   const net = quoteIn - fee - tax;
   await recordTrade(event, context, { isBuy: true, trader: buyer, recipient, quote: quoteIn, tokens: tokensOut, fee, tax, reserveDelta: net, curveQuote: net });
 });
 
-indexer.onEvent({ contract: 'PonsV2Curve', event: 'CurveSell' }, async ({ event, context }) => {
+indexer.onEvent({ contract: 'PonsV2Curve', event: 'CurveSell', wildcard: true }, async ({ event, context }) => {
   const { seller, recipient, tokensIn, quoteOut, fee, tax } = event.params;
   const gross = quoteOut + fee + tax;
   await recordTrade(event, context, { isBuy: false, trader: seller, recipient, quote: gross, tokens: tokensIn, fee, tax, reserveDelta: -gross, curveQuote: gross });

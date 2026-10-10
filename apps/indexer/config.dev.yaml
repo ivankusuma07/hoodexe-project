@@ -8,7 +8,7 @@ contracts:
       - event: TokenLaunched(address indexed token, address indexed curve, address indexed deployer, address pairToken, uint256 launchConfigId, uint256 graduationThreshold)
       - event: LaunchSwept(address indexed token, uint256 quoteOut, uint256 tokenOut)
       - event: PoolGraduated(address indexed token, uint256 positionId, uint256 tokenAmount, uint256 pairTokenAmount)
-  # One per launch; registered from TokenLaunched, so it has no address here.
+  # One per launch. Handlers match its events by signature (wildcard) and check the Curve table, so no addresses.
   - name: PonsV2Curve
     events:
       - event: CurveBuy(address indexed buyer, address indexed recipient, uint256 quoteIn, uint256 tokensOut, uint256 fee, uint256 tax)
